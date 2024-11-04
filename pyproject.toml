@@ -1,0 +1,66 @@
+[build-system]
+requires = ["setuptools >= 64.0", "setuptools-scm>=8.0"]
+build-backend = "setuptools.build_meta"
+
+
+[project]
+name = "pytest-smoke"
+description = "pytest plugin for supporting smoke testing"
+readme = "README.md"
+license = {file="LICENSE"}
+authors = [
+  { name = "Yugo Kato", email =  "yugokato.o@gmail.com" },
+]
+keywords = ["pytest", "smoke"]
+requires-python = ">=3.9"
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Framework :: Pytest",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Topic :: Software Development :: Quality Assurance",
+  "Topic :: Software Development :: Testing",
+]
+dependencies = [
+    "pytest>=7.0.0,<9"
+]
+dynamic = ["version"]
+
+
+[project.optional-dependencies]
+dev = [
+    "pre-commit==4.0.1",
+    "ruff==0.7.1",
+    "tox==4.23.2"
+]
+
+[project.urls]
+Homepage = "https://github.com/yugokato/pytest-smoke"
+
+[project.entry-points.pytest11]
+smoke = "pytest_smoke.plugin"
+
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+
+[tool.setuptools_scm]
+local_scheme = "no-local-version"
+
+[tool.ruff]
+line-length = 120
+indent-width = 4
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle
+    "F",    # Pyflakes
+    "I",    # isort
+    "UP",   # pyupgrade
+]
