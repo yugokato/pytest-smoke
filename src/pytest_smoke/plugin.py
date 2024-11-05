@@ -6,7 +6,8 @@ from pytest import Config, Item, Parser, Session
 
 
 def pytest_addoption(parser: Parser):
-    parser.addoption(
+    group = parser.getgroup("smoke", description="Smoke testing")
+    group.addoption(
         "--smoke",
         dest="smoke",
         metavar="N",
