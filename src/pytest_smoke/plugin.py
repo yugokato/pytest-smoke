@@ -1,8 +1,9 @@
 import argparse
+import random
 from collections import Counter
 
 import pytest
-from pytest import Config, Item, Parser, Session
+from pytest import Config, Item, Parser
 
 
 def pytest_addoption(parser: Parser):
@@ -15,20 +16,45 @@ def pytest_addoption(parser: Parser):
         type=_parse_smoke_option,
         nargs="?",
         default=False,
-        help="Run only the first N (default=1) tests from each test function",
+        help="Run the first N tests (default=1) from each test function",
+    )
+    group.addoption(
+        "--smoke-random",
+        dest="smoke_random",
+        metavar="N",
+        const=True,
+        type=_parse_smoke_option,
+        nargs="?",
+        default=False,
+        help="Run N randomly selected tests (default=1) from each test function",
     )
 
 
+@pytest.hookimpl(tryfirst=True)
+def pytest_configure(config: Config):
+    if config.option.smoke and config.option.smoke_random:
+        raise pytest.UsageError("--smoke and --smoke-random are mutually exclusive")
+
+
 @pytest.hookimpl(trylast=True)
-def pytest_collection_modifyitems(session: Session, config: Config, items: list[Item]):
-    if num_tests_to_smoke := int(config.option.smoke):
+def pytest_collection_modifyitems(config: Config, items: list[Item]):
+    if num_tests_to_smoke := int(config.option.smoke or config.option.smoke_random):
         counter = Counter()
         filtered_items = []
-        for item in items:
+        if config.option.smoke_random:
+            items_to_filter = sorted(items, key=lambda x: random.random())
+        else:
+            items_to_filter = items
+
+        for item in items_to_filter:
             test_func_name = item.function.__name__  # type: ignore
             if counter.get(test_func_name, 0) < num_tests_to_smoke:
                 counter.update([test_func_name])
                 filtered_items.append(item)
+
+        if config.option.smoke_random:
+            # retain the original test order
+            filtered_items.sort(key=lambda x: items.index(x))
 
         del items[:]
         items.extend(filtered_items)
