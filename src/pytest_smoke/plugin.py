@@ -38,9 +38,10 @@ def pytest_configure(config: Config):
 
 @pytest.hookimpl(trylast=True)
 def pytest_collection_modifyitems(config: Config, items: list[Item]):
-    if num_tests_to_smoke := int(config.option.smoke or config.option.smoke_random):
+    if items and (num_tests_to_smoke := int(config.option.smoke or config.option.smoke_random)):
         counter = Counter()
-        filtered_items = []
+        selected_items = []
+        deselected_items = []
         if config.option.smoke_random:
             items_to_filter = sorted(items, key=lambda x: random.random())
         else:
@@ -50,14 +51,18 @@ def pytest_collection_modifyitems(config: Config, items: list[Item]):
             test_func_name = item.function.__name__  # type: ignore
             if counter.get(test_func_name, 0) < num_tests_to_smoke:
                 counter.update([test_func_name])
-                filtered_items.append(item)
+                selected_items.append(item)
+            else:
+                deselected_items.append(item)
 
-        if config.option.smoke_random:
-            # retain the original test order
-            filtered_items.sort(key=lambda x: items.index(x))
+        if len(selected_items) < len(items):
+            if config.option.smoke_random:
+                # retain the original test order
+                selected_items.sort(key=lambda x: items.index(x))
 
-        del items[:]
-        items.extend(filtered_items)
+            del items[:]
+            items.extend(selected_items)
+            config.hook.pytest_deselected(items=deselected_items)
 
 
 def _parse_smoke_option(value: str) -> int:
