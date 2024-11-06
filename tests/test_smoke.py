@@ -59,7 +59,7 @@ def test_collection(pytester: Pytester, option):
 def test_valid_n(pytester: Pytester, option, n):
     """Test the option with no value, or with positive numbers"""
     assert NUM_PARAMETRIZATION1 < NUM_PARAMETRIZATION2
-    pytester.makepyfile(f"""
+    test_file = pytester.makepyfile(f"""
         import pytest
         
         def test_something1():
@@ -73,6 +73,7 @@ def test_valid_n(pytester: Pytester, option, n):
         def test_something3(p):
             pass
     """)
+    num_tests = len(pytester.getitems(test_file))
 
     args = [option]
     if n:
@@ -90,7 +91,7 @@ def test_valid_n(pytester: Pytester, option, n):
             num_passed += NUM_PARAMETRIZATION1 + NUM_PARAMETRIZATION2
     else:
         num_passed += 2
-    result.assert_outcomes(passed=num_passed)
+    result.assert_outcomes(passed=num_passed, deselected=num_tests - num_passed)
 
 
 @pytest.mark.filterwarnings("ignore::pluggy.PluggyTeardownRaisedWarning")

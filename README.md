@@ -59,7 +59,7 @@ You can run smoke tests with either the `--smoke` or `--smoke-random` option:
 $ pytest -v --smoke
 ======================== test session starts =========================
 <snip>
-collected 31 items                                                   
+collected 31 items / 28 deselected / 3 selected                                                   
 
 tests/test_something.py::test_something1 PASSED                 [ 33%]
 tests/test_something.py::test_something2[0] PASSED              [ 66%]
@@ -73,7 +73,7 @@ tests/test_something.py::test_something3[0] PASSED              [100%]
 $ pytest -v --smoke 3
 ======================== test session starts =========================
 <snip>
-collected 31 items                                                   
+collected 31 items / 24 deselected / 7 selected                                                  
 
 tests/test_something.py::test_something1 PASSED                 [ 14%]
 tests/test_something.py::test_something2[0] PASSED              [ 28%]
@@ -92,7 +92,7 @@ tests/test_something.py::test_something3[2] PASSED              [100%]
 $ pytest -v --smoke-random
 ======================== test session starts =========================
 <snip>
-collected 31 items                                                   
+collected 31 items / 28 deselected / 3 selected                                                   
 
 tests/test_something.py::test_something1 PASSED                 [ 33%]
 tests/test_something.py::test_something2[4] PASSED              [ 66%]
@@ -106,7 +106,7 @@ tests/test_something.py::test_something3[8] PASSED              [100%]
 $ pytest -v --smoke-random 3
 ======================== test session starts =========================
 <snip>
-collected 31 items                                                   
+collected 31 items / 24 deselected / 7 selected                                                   
 
 tests/test_something.py::test_something1 PASSED                 [ 14%]
 tests/test_something.py::test_something2[1] PASSED              [ 28%]
