@@ -1,0 +1,13 @@
+version: 2
+updates:
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      # Aim the same timing as pre-commit.ci autoupdate to sync dependency versions between pyproject.toml and
+      # pre-commit config until after I figure out a better solution
+      interval: "weekly"
+      day: "monday"
+      time: "16:00"
+      timezone: "UTC"
+    target-branch: "main"
+    open-pull-requests-limit: 10
