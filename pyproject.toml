@@ -5,13 +5,13 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pytest-smoke"
-description = "pytest plugin for supporting smoke testing"
+description = "Pytest plugin for smoke testing"
 readme = "README.md"
 license = {file="LICENSE"}
 authors = [
-  { name = "Yugo Kato", email =  "yugokato.o@gmail.com" },
+  { name = "Yugo Kato" },
 ]
-keywords = ["pytest", "smoke"]
+keywords = ["pytest", "smoke", "smoke testing"]
 requires-python = ">=3.9"
 classifiers = [
   "Development Status :: 4 - Beta",
