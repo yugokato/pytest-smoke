@@ -162,4 +162,4 @@ cython_debug/
 .DS_Store
 
 # Unofficial tests
-tests/**/_*.py
+tests/_*/**

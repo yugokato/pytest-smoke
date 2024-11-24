@@ -3,15 +3,17 @@ from functools import lru_cache
 
 
 @lru_cache
-def calculate_scaled_value(total: float, percentage: float, precision: int = 0, min_value: int = 1) -> float:
-    """Calculates a scaled value with rounding
+def scale_down(value: float, percentage: float, precision: int = 0, min_value: int = 1) -> float:
+    """Scales down a value with rounding
 
-    :param total: The total value to calculate the percentage from
-    :param percentage: The percentage to apply to the total
+    :param value: The current value to calculate the percentage from
+    :param percentage: The percentage to apply to the current value
     :param precision: The number of decimal places to round to
     :param min_value: The minimum allowed value after calculation
     """
-    val = _round_half_up(total * percentage / 100, precision)
+    if percentage > 100:
+        raise ValueError("The percentage must be 100 or smaller")
+    val = _round_half_up(value * percentage / 100, precision)
     return max(val, min_value)
 
 

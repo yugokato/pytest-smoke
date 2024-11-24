@@ -8,9 +8,10 @@ versions](https://img.shields.io/pypi/pyversions/pytest-smoke.svg)](https://pypi
 [![pre-commit.ci status](https://results.pre-commit.ci/badge/github/yugokato/pytest-smoke/main.svg)](https://results.pre-commit.ci/latest/github/yugokato/pytest-smoke/main)
 [![Code style ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://docs.astral.sh/ruff/)
 
-A small `pytest` plugin that enables quick smoke testing against a large test suite by limiting the number of tests 
-from each parametrized test function to a specified value of `N`.  
-You can define `N` as either a fixed number or a percentage, allowing you to scale the test execution down to a smaller subset.
+A small `pytest` plugin that enables quick smoke testing against a large test suite by limiting the number of tests from 
+each test function (or specified scope) to a value of `N`.  
+You can define `N` as either a fixed number or a percentage, allowing you to scale the test execution down to a smaller 
+subset.
 
 
 ## Installation
@@ -22,19 +23,28 @@ pip install pytest-smoke
 
 ## Usage
 
-The plugin provides the following options, each accepting an optional value `N`:
+The plugin provides the following options, allowing you to limit the amount of tests to run (`N`) and optionally specify 
+ the scope at which `N` is applied:
 ```
 $ pytest -h
 
 <snip>
 
 Smoke testing:
-  --smoke=[N]           Run the first N (default=1) tests from each test function
-  --smoke-last=[N]      Run the last N (default=1) tests from each test function
-  --smoke-random=[N]    Run N (default=1) randomly selected tests from each test function
+  --smoke=[N]           Run the first N (default=1) tests from each test function or specified scope
+  --smoke-last=[N]      Run the last N (default=1) tests from each test function or specified scope
+  --smoke-random=[N]    Run N (default=1) randomly selected tests from each test function or specified scope
+  --smoke-scope=SCOPE   Specify the scope at which N from the above options is applied.
+                        Supported values:
+                        - function: Applies to each test function (default)
+                        - class: Applies to each test class
+                        - file: Applies to each test file
+                        - all: Applies to the entire test suite
+
 ```
 
-> If `N` is not explicitly specified, the default value 1 will be automatically applied
+> - The `N` value can be a number (eg. 5) or a percentage (eg. 10%)
+> - If `N` is not explicitly specified, the default value of `1` will be used
 
 
 ## Examples
@@ -211,3 +221,6 @@ tests/test_something.py::test_something3[17] PASSED              [100%]
 
 =================== 7 passed, 24 deselected in 0.02s ===================
 ```
+
+
+> For any of the above examples, you can change the scope of `N` using the `--smoke-scope` option
