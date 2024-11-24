@@ -1,116 +1,87 @@
 import re
+from collections.abc import Sequence
 from itertools import combinations
+from typing import Optional
 
 import pytest
 from pytest import ExitCode, Pytester
 
-NUM_PARAMETRIZATION1 = 5
-NUM_PARAMETRIZATION2 = 10
-OPTIONS = ["--smoke", "--smoke-last", "--smoke-random"]
+from pytest_smoke.plugin import SmokeScope
+from tests.helper import (
+    TestFileSpec,
+    get_num_tests,
+    get_num_tests_to_be_selected,
+)
+
+SMOKE_OPTIONS = ["--smoke", "--smoke-last", "--smoke-random"]
 
 
 def test_smoke_command_help(pytester: Pytester):
     """Test pytest command help for this plugin"""
     result = pytester.runpytest("-h")
-    result.stdout.re_match_lines([r"Smoke testing:", *(rf"\s+{opt}=\[N\]\s+.+" for opt in OPTIONS)])
+    assert result.ret == ExitCode.OK, str(result.stderr)
+    pattern = (
+        r"Smoke testing:\n"
+        r"  --smoke=\[N\]\s+.+"
+        r"  --smoke-last=\[N\]\s+.+"
+        r"  --smoke-random=\[N\]\s+.+"
+        r"  --smoke-scope=SCOPE\s+.+"
+    )
+    assert re.search(pattern, str(result.stdout), re.DOTALL)
 
 
-@pytest.mark.parametrize("option", OPTIONS)
-def test_smoke_collection(pytester: Pytester, option):
-    """Test the result of test collection"""
-    num_tests = 30
-    test_name = "test_something"
-    pattern_test_id = rf".+::{test_name}\[\d*\]"
-    pytester.makepyfile(f"""
-        import pytest
-
-        @pytest.mark.parametrize("p", range({num_tests}))
-        def {test_name}(p):
-            pass
-        """)
-
-    n = 10
-    args = [option, n, "--collect-only", "-q"]
-    prev_collected_tests = None
-    for i in range(2):
-        result = pytester.runpytest(*args)
-        assert result.ret == ExitCode.OK
-        result.assert_outcomes(deselected=num_tests - n)
-        collected_tests = re.findall(pattern_test_id, str(result.stdout))
-        assert len(collected_tests) == n
-        if prev_collected_tests:
-            if option == "--smoke-random":
-                assert prev_collected_tests != collected_tests
-            else:
-                assert prev_collected_tests == collected_tests
-        prev_collected_tests = collected_tests
-
-
-@pytest.mark.parametrize(
-    "n",
-    [
-        None,
-        1,
-        NUM_PARAMETRIZATION1 - 1,
-        NUM_PARAMETRIZATION1,
-        NUM_PARAMETRIZATION1 + 1,
-        NUM_PARAMETRIZATION2,
-        NUM_PARAMETRIZATION2 + 1,
-    ],
-)
-@pytest.mark.parametrize("option", OPTIONS)
-def test_smoke_with_valid_n(pytester: Pytester, option, n):
-    """Test the option with no value, or with positive numbers"""
-    assert NUM_PARAMETRIZATION1 < NUM_PARAMETRIZATION2
-    test_file = pytester.makepyfile(f"""
-        import pytest
-        
-        def test_something1():
-            pass
-            
-        @pytest.mark.parametrize("p", range({NUM_PARAMETRIZATION1}))
-        def test_something2(p):
-            pass
-            
-        @pytest.mark.parametrize("p", range({NUM_PARAMETRIZATION2}))
-        def test_something3(p):
-            pass
-    """)
-    num_tests = len(pytester.getitems(test_file))
-
+@pytest.mark.usefixtures("generate_test_files")
+@pytest.mark.parametrize("scope", [None, *SmokeScope])
+@pytest.mark.parametrize("n", [None, "1", "5", "15", "25", "35", str(2**32 - 1), "1%", "1.23%", "10%", "33%", "100%"])
+@pytest.mark.parametrize("option", SMOKE_OPTIONS)
+def test_smoke_with_valid_n(
+    pytester: Pytester,
+    test_file_specs: list[TestFileSpec],
+    option: str,
+    n: Optional[str],
+    scope: Optional[str],
+):
+    """Test all combinations of smoke options and scopes with various N values"""
+    num_all_tests = get_num_tests(*test_file_specs)
+    num_tests_to_be_selected = get_num_tests_to_be_selected(test_file_specs, n, scope)
     args = [option]
     if n:
         args.append(n)
+    if scope:
+        args.extend(["--smoke-scope", scope])
     result = pytester.runpytest(*args)
-    assert result.ret == ExitCode.OK
-
-    num_passed = 1
-    if n:
-        if n <= NUM_PARAMETRIZATION1:
-            num_passed += n * 2
-        elif n <= NUM_PARAMETRIZATION2:
-            num_passed += NUM_PARAMETRIZATION1 + n
-        else:
-            num_passed += NUM_PARAMETRIZATION1 + NUM_PARAMETRIZATION2
-    else:
-        num_passed += 2
-    result.assert_outcomes(passed=num_passed, deselected=num_tests - num_passed)
+    result.assert_outcomes(passed=num_tests_to_be_selected, deselected=num_all_tests - num_tests_to_be_selected)
 
 
 @pytest.mark.filterwarnings("ignore::pluggy.PluggyTeardownRaisedWarning")
-@pytest.mark.parametrize("n", [-1, 0, "foo"])
-@pytest.mark.parametrize("option", OPTIONS)
-def test_smoke_with_invalid_n(pytester: Pytester, option, n):
+@pytest.mark.parametrize("n", ["-1", "0", "0.5", "1.1", "foo", " -1%", "0%", "101%", "bar%"])
+@pytest.mark.parametrize("option", SMOKE_OPTIONS)
+def test_smoke_with_invalid_n(pytester: Pytester, option: Optional[str], n: str):
     """Test the option with invalid values"""
     result = pytester.runpytest(option, n)
     assert result.ret == ExitCode.USAGE_ERROR
-    result.stderr.re_match_lines([rf".+ {option}: The value must be a positive number if given\."])
+    result.stderr.re_match_lines(
+        [rf".+ {option}: The value must be a positive number or a valid percentage if given\."]
+    )
 
 
 @pytest.mark.filterwarnings("ignore::pluggy.PluggyTeardownRaisedWarning")
-@pytest.mark.parametrize("options", [comb for r in range(2, len(OPTIONS) + 1) for comb in combinations(OPTIONS, r)])
-def test_smoke_options_are_mutually_exclusive(pytester: Pytester, options):
+@pytest.mark.parametrize("scope", [*SmokeScope])
+def test_smoke_scope_without_n_option(pytester: Pytester, scope: str):
+    """Test --smoke-scope option can not be used without other smoke option"""
+    result = pytester.runpytest("--smoke-scope", scope)
+    assert result.ret == ExitCode.USAGE_ERROR
+    result.stderr.re_match_lines(
+        ["ERROR: The --smoke-scope option requires one of --smoke, --smoke-last, or --smoke-random to be specified"]
+    )
+
+
+@pytest.mark.filterwarnings("ignore::pluggy.PluggyTeardownRaisedWarning")
+@pytest.mark.parametrize(
+    "options", [comb for r in range(2, len(SMOKE_OPTIONS) + 1) for comb in combinations(SMOKE_OPTIONS, r)]
+)
+def test_smoke_options_are_mutually_exclusive(pytester: Pytester, options: Sequence[str]):
     """Test smoke options are mutually exclusive"""
     result = pytester.runpytest(*options)
     assert result.ret == ExitCode.USAGE_ERROR
-    result.stderr.re_match_lines(["ERROR: --smoke, --smoke-last, and --smoke-random are mutually exclusive"])
+    result.stderr.re_match_lines(["ERROR: --smoke, --smoke-last, and --smoke-random options are mutually exclusive"])
