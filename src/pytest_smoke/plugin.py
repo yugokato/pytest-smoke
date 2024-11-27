@@ -12,6 +12,7 @@ from pytest_smoke.utils import scale_down
 
 
 class SmokeScope(str, Enum):
+    @staticmethod
     def _generate_next_value_(name, start, count, last_values):
         return name.lower()
 
