@@ -95,9 +95,10 @@ def pytest_collection_modifyitems(config: Config, items: list[Item]):
             num_smoke = float(n[:-1])
         else:
             num_smoke = n
+        scope = config.option.smoke_scope or SmokeScope.FUNCTION
         selected_items = []
         deselected_items = []
-        counter_collected = Counter(_generate_id(item) for item in items)
+        counter_collected = Counter(_generate_id(item, scope) for item in items)
         counter_selected = Counter()
         tests_reached_threshold = set()
         if config.option.smoke_random:
@@ -108,26 +109,25 @@ def pytest_collection_modifyitems(config: Config, items: list[Item]):
             items_to_filter = items
 
         for item in items_to_filter:
-            scope = item.config.option.smoke_scope
-            test_func_id = _generate_id(item)
+            scoped_item_id = _generate_id(item, scope)
             if (
                 scope == SmokeScope.CLASS and not getattr(item, "cls", None)
-            ) or test_func_id in tests_reached_threshold:
+            ) or scoped_item_id in tests_reached_threshold:
                 deselected_items.append(item)
                 continue
 
             if is_scale:
-                num_tests = counter_collected[test_func_id]
+                num_tests = counter_collected[scoped_item_id]
                 threshold = scale_down(num_tests, num_smoke)
             else:
                 threshold = num_smoke
 
-            num_selected_tests = counter_selected[test_func_id]
+            num_selected_tests = counter_selected[scoped_item_id]
             if num_selected_tests < threshold:
-                counter_selected.update([test_func_id])
+                counter_selected.update([scoped_item_id])
                 selected_items.append(item)
             else:
-                tests_reached_threshold.add(test_func_id)
+                tests_reached_threshold.add(scoped_item_id)
                 deselected_items.append(item)
 
         if len(selected_items) < len(items):
@@ -159,12 +159,11 @@ def _parse_smoke_option(value: str) -> Union[int, str]:
 
 
 @lru_cache
-def _generate_id(item: Item) -> str:
-    scope = item.config.option.smoke_scope or SmokeScope.FUNCTION
+def _generate_id(item: Item, scope: str) -> str:
     if scope == SmokeScope.ALL:
         return "*"
 
-    scoped_id = item.location[0]
+    scoped_id = str(item.path or item.location[0])
     if scope == SmokeScope.FILE:
         return scoped_id
 
