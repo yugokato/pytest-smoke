@@ -35,9 +35,11 @@ dynamic = ["version"]
 
 [project.optional-dependencies]
 dev = [
-    "pre-commit==4.0.1",
+    "pre-commit>=3.0.0,<5",
+    "pytest-xdist[psutil]>=2.5.0,<4",
     "ruff==0.8.1",
-    "tox==4.23.2"
+    "tox>=4.0.0,<5",
+    "tox-uv>=1.0.0,<2"
 ]
 
 [project.urls]
