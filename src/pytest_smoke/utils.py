@@ -1,5 +1,18 @@
+import sys
 from decimal import ROUND_HALF_UP, Decimal
+from enum import Enum
 from functools import lru_cache
+
+if sys.version_info.major == 3 and sys.version_info.minor < 11:
+
+    class StrEnum(str, Enum):
+        def _generate_next_value_(name, start, count, last_values) -> str:
+            return name.lower()
+
+        def __str__(self) -> str:
+            return str(self.value)
+else:
+    from enum import StrEnum  # noqa: F401
 
 
 @lru_cache

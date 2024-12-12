@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import ast
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from itertools import chain
 
-from pytest_smoke.plugin import SmokeScope
+from pytest_smoke.plugin import DEFAULT_N, SmokeScope
 from pytest_smoke.utils import scale_down
 
 TEST_NAME_BASE = "test_something"
@@ -28,6 +29,7 @@ class TestClassSpec:
     name: str
     test_func_specs: list[TestFuncSpec] = field(default_factory=list)
     num_params: int = 0
+    param_marker: Callable[[int], str | None] = None
 
     def __post_init__(self):
         for test_func_spec in self.test_func_specs:
@@ -42,28 +44,45 @@ class TestFuncSpec:
 
     num_params: int = 0
     test_class_spec: TestClassSpec = field(init=False, default=None)
+    param_marker: Callable[[int], str | None] = None
 
 
-def generate_test_code(test_file_spec: TestFileSpec) -> str:
+def generate_test_code(test_spec: TestFileSpec | TestFuncSpec) -> str:
     """Generate test code from the test file spec
 
-    :param test_file_spec: Test file spec
+    :param test_spec: Test file spec or Test func spec
     """
     param_c = "c"
     param_f = "f"
     code = "import pytest\n"
 
-    def add_parametrize_marker(*param_names: str, num_params: int = 0, with_indent: bool = False):
+    def add_parametrize_marker(
+        *param_names: str,
+        num_params: int = 0,
+        with_indent: bool = False,
+        param_marker: Callable[[int], str | None] = None,
+    ):
         nonlocal code
         params = ", ".join(param_names)
         if with_indent:
             code += "\t"
-        code += f"@pytest.mark.parametrize('{params}', range({num_params}))\n"
+        if param_marker:
+            param_values = ", ".join(
+                [
+                    (f"pytest.param({p}, marks=pytest.mark.{param_marker(p)})" if param_marker(p) else str(p))
+                    for p in range(num_params)
+                ]
+            )
+            code += f"@pytest.mark.parametrize('{params}', [{param_values}])\n"
+        else:
+            code += f"@pytest.mark.parametrize('{params}', range({num_params}))\n"
 
     def add_class(test_class_spec: TestClassSpec):
         nonlocal code
         if test_class_spec.num_params:
-            add_parametrize_marker(param_c, num_params=test_class_spec.num_params)
+            add_parametrize_marker(
+                param_c, num_params=test_class_spec.num_params, param_marker=test_class_spec.param_marker
+            )
         code += f"class {test_class_spec.name}:\n"
 
     def add_function(name: str, test_func_spec: TestFuncSpec, test_class_spec: TestClassSpec = None):
@@ -73,20 +92,28 @@ def generate_test_code(test_file_spec: TestFileSpec) -> str:
             params.append(param_c)
         if test_func_spec.num_params:
             params.append(param_f)
-            add_parametrize_marker(param_f, num_params=test_func_spec.num_params, with_indent=bool(test_class_spec))
+            add_parametrize_marker(
+                param_f,
+                num_params=test_func_spec.num_params,
+                param_marker=test_func_spec.param_marker,
+                with_indent=bool(test_class_spec),
+            )
         sig = ", ".join(params)
         if test_class_spec:
             sig = "self, " + sig
             code += "\t"
         code += f"def {name}({sig}):\tpass\n\n"
 
-    for i, spec in enumerate(test_file_spec.test_specs, start=1):
-        if isinstance(spec, TestClassSpec):
-            add_class(spec)
-            for j, func_spec in enumerate(spec.test_func_specs, start=1):
-                add_function(f"{TEST_NAME_BASE}{j}", func_spec, test_class_spec=spec)
-        else:
-            add_function(f"{TEST_NAME_BASE}{i}", spec)
+    if isinstance(test_spec, TestFileSpec):
+        for i, spec in enumerate(test_spec.test_specs, start=1):
+            if isinstance(spec, TestClassSpec):
+                add_class(spec)
+                for j, func_spec in enumerate(spec.test_func_specs, start=1):
+                    add_function(f"{TEST_NAME_BASE}{j}", func_spec, test_class_spec=spec)
+            else:
+                add_function(f"{TEST_NAME_BASE}{i}", spec)
+    else:
+        add_function(TEST_NAME_BASE, test_spec)
 
     ast.parse(code)
     return code
@@ -120,7 +147,7 @@ def get_num_tests_to_be_selected(test_file_specs: list[TestFileSpec], n: str | N
     :param n: N value given for the smoke option
     :param scope: Smoke scope value
     """
-    n = n or "1"
+    n = n or str(DEFAULT_N)
     is_scale = n.endswith("%")
     test_class_specs = get_test_class_specs(test_file_specs)
     if is_scale:
