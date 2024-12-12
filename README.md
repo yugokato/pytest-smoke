@@ -34,17 +34,19 @@ Smoke testing:
   --smoke=[N]           Run the first N (default=1) tests from each test function or specified scope
   --smoke-last=[N]      Run the last N (default=1) tests from each test function or specified scope
   --smoke-random=[N]    Run N (default=1) randomly selected tests from each test function or specified scope
-  --smoke-scope=SCOPE   Specify the scope at which N from the above options is applied.
-                        Supported values:
+  --smoke-scope=SCOPE   Specify the scope at which the value of N from the above options is applied.
+                        The plugin provides the following predefined scopes:
                         - function: Applies to each test function (default)
                         - class: Applies to each test class
                         - file: Applies to each test file
                         - all: Applies to the entire test suite
-
+                        NOTE: You can also implement your own custom scopes using a hook
 ```
 
-> - The `N` value can be a number (eg. 5) or a percentage (eg. 10%)
+> - The value of `N` can be a number (e.g. `5`) or a percentage (e.g. `10%`)
 > - If `N` is not explicitly specified, the default value of `1` will be used
+> - The `--smoke-scope` option supports any custom values, as long as they are handled in the hook
+> - You can overwrite the plugin's default value for `N` and `SCOPE` using INI options. See the "INI Options" section below
 
 
 ## Examples
@@ -67,7 +69,8 @@ def test_something3(p):
     pass
 ```
 
-You can run smoke tests with either the `--smoke`, `--smoke-last`, or `--smoke-random` option:
+You can run smoke tests with either the `--smoke`, `--smoke-last`, or `--smoke-random` option.   
+Here are some examples for each option with the default scope (test function):
 
 ### 1. `--smoke` option
 - Run only the first test from each test function
@@ -222,5 +225,37 @@ tests/test_something.py::test_something3[17] PASSED              [100%]
 =================== 7 passed, 24 deselected in 0.02s ===================
 ```
 
-
 > For any of the above examples, you can change the scope of `N` using the `--smoke-scope` option
+
+
+## Hooks
+
+The plugin provides the following hooks to customize or extend the plugin's capabilities: 
+
+### `pytest_smoke_generate_group_id(item, scope)`
+This hook allows you to implement your own custom scopes for the `--scope-smoke` option, or overwrite the logic of the 
+predefined scopes. Items with the same group ID are grouped together and are considered to be in the same scope, 
+at which `N` is applied. Any custom values passed to the  `--smoke-scope` option must be handled in this hook.
+
+### `pytest_smoke_always_run(item, scope)`
+Return `True` for tests that will always be executed regardless of what options are specified. These items will be 
+considered additional tests and will not be counted towards the calculation of `N`.
+
+### `pytest_smoke_exclude(item, scope)`
+Return `True` for tests that should not be selected. These items will not be included in the total number of tests to 
+which `N`% is applied. An example use case is to prevent tests that are marked with `skip` and/or `xfail` from being 
+selected.
+
+
+## INI Options
+
+You can overwrite the plugin's default values by setting the following options in a configuration 
+file (pytest.ini, pyproject.toml, etc.).  
+
+### `default_smoke_n`
+The default `N` value to be applied when not provided to a smoke option.  
+Plugin default: `1`
+
+### `default_smoke_scope`
+The default smoke scope to be applied when not explicitly specified with the `--smoke-scope` option.  
+Plugin default: `function`

@@ -1,7 +1,7 @@
 import pytest
 from pytest import Pytester
 
-from pytest_smoke.plugin import SmokeScope
+from pytest_smoke.utils import StrEnum
 from tests.helper import TestClassSpec, TestFileSpec, TestFuncSpec, generate_test_code
 
 pytest_plugins = "pytester"
@@ -9,7 +9,7 @@ pytest_plugins = "pytester"
 
 @pytest.hookimpl(trylast=True)
 def pytest_make_parametrize_id(val, argname):
-    if isinstance(val, SmokeScope):
+    if isinstance(val, StrEnum):
         val = str(val)
     return f"{argname}={repr(val)}"
 
