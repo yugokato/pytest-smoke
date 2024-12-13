@@ -13,6 +13,7 @@ from pytest_smoke.utils import StrEnum, scale_down
 class SmokeScope(StrEnum):
     FUNCTION = auto()
     CLASS = auto()
+    AUTO = auto()
     FILE = auto()
     ALL = auto()
 
@@ -77,6 +78,8 @@ def pytest_addoption(parser: Parser):
             "The plugin provides the following predefined scopes:\n"
             f"- {SmokeScope.FUNCTION}: Applies to each test function (default)\n"
             f"- {SmokeScope.CLASS}: Applies to each test class\n"
+            f"- {SmokeScope.AUTO}: Applies {SmokeScope.FUNCTION} scope for test functions, "
+            f"{SmokeScope.CLASS} scope for test methods\n"
             f"- {SmokeScope.FILE}: Applies to each test file\n"
             f"- {SmokeScope.ALL}: Applies to the entire test suite\n"
             "NOTE: You can also implement your own custom scopes using a hook"
@@ -230,7 +233,7 @@ def _generate_group_id(item: Item, scope: str) -> Optional[str]:
 
     if cls:
         group_id += f"::{cls.__name__}"
-        if scope == SmokeScope.CLASS:
+        if scope in [SmokeScope.CLASS, SmokeScope.AUTO]:
             return group_id
 
     # The default scope
