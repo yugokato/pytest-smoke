@@ -154,10 +154,20 @@ def get_num_tests_to_be_selected(test_file_specs: list[TestFileSpec], n: str | N
         scale = float(n[:-1])
         if scope == SmokeScope.ALL:
             num_expected_tests = scale_down(get_num_tests(*test_file_specs), scale)
-        elif scope == SmokeScope.CLASS:
-            num_expected_tests = sum([int(scale_down(get_num_tests(x), scale)) for x in test_class_specs])
         elif scope == SmokeScope.FILE:
             num_expected_tests = sum([int(scale_down(get_num_tests(*x.test_specs), scale)) for x in test_file_specs])
+        elif scope == SmokeScope.AUTO:
+            num_expected_tests = sum(
+                [
+                    *(int(scale_down(get_num_tests(x), scale)) for x in test_class_specs),
+                    *(
+                        int(scale_down(get_num_tests(x), scale))
+                        for x in get_test_func_specs(test_file_specs, exclude_class=True)
+                    ),
+                ]
+            )
+        elif scope == SmokeScope.CLASS:
+            num_expected_tests = sum([int(scale_down(get_num_tests(x), scale)) for x in test_class_specs])
         else:
             num_expected_tests = sum(
                 [int(scale_down(get_num_tests(x), scale)) for x in get_test_func_specs(test_file_specs)]
@@ -165,10 +175,20 @@ def get_num_tests_to_be_selected(test_file_specs: list[TestFileSpec], n: str | N
     else:
         if scope == SmokeScope.ALL:
             num_expected_tests = min([int(n), get_num_tests(*test_file_specs)])
-        elif scope == SmokeScope.CLASS:
-            num_expected_tests = sum([min([int(n), get_num_tests(x)]) for x in test_class_specs])
         elif scope == SmokeScope.FILE:
             num_expected_tests = sum([min([int(n), get_num_tests(*x.test_specs)]) for x in test_file_specs])
+        elif scope == SmokeScope.AUTO:
+            num_expected_tests = sum(
+                [
+                    *(min([int(n), get_num_tests(x)]) for x in test_class_specs),
+                    *(
+                        min([int(n), get_num_tests(x)])
+                        for x in get_test_func_specs(test_file_specs, exclude_class=True)
+                    ),
+                ]
+            )
+        elif scope == SmokeScope.CLASS:
+            num_expected_tests = sum([min([int(n), get_num_tests(x)]) for x in test_class_specs])
         else:
             num_expected_tests = sum([min([int(n), get_num_tests(x)]) for x in get_test_func_specs(test_file_specs)])
 
@@ -184,10 +204,13 @@ def get_test_class_specs(test_file_specs: list[TestFileSpec]) -> list[TestClassS
     return [x for x in test_specs if isinstance(x, TestClassSpec)]
 
 
-def get_test_func_specs(test_file_specs: list[TestFileSpec]) -> list[TestFuncSpec]:
+def get_test_func_specs(test_file_specs: list[TestFileSpec], exclude_class: bool = False) -> list[TestFuncSpec]:
     """Returns all TestFuncSpec objects from test file specs
 
     :param test_file_specs: Test file specs
+    :param exclude_class: Exclude test func specs defined under a test class spec
     """
     test_specs = list(chain(*[x.test_specs for x in test_file_specs]))
+    if exclude_class:
+        test_specs = [x for x in test_specs if not isinstance(x, TestClassSpec)]
     return list(chain(*[(x.test_func_specs if isinstance(x, TestClassSpec) else [x]) for x in test_specs]))

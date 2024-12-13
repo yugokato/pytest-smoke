@@ -38,6 +38,7 @@ Smoke testing:
                         The plugin provides the following predefined scopes:
                         - function: Applies to each test function (default)
                         - class: Applies to each test class
+                        - auto: Applies function scope for test functions, class scope for test methods
                         - file: Applies to each test file
                         - all: Applies to the entire test suite
                         NOTE: You can also implement your own custom scopes using a hook
