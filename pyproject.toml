@@ -37,7 +37,7 @@ dynamic = ["version"]
 dev = [
     "pre-commit>=3.0.0,<5",
     "pytest-xdist[psutil]>=2.5.0,<4",
-    "ruff==0.8.2",
+    "ruff==0.8.3",
     "tox>=4.0.0,<5",
     "tox-uv>=1.0.0,<2"
 ]
