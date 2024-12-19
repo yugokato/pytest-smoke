@@ -145,14 +145,14 @@ def test_smoke_hook_pytest_smoke_exclude(pytester: Pytester, option: str, n: str
 
 
 @pytest.mark.parametrize("option", SMOKE_OPTIONS)
-def test_smoke_ini_option_default_smoke_n(pytester: Pytester, option: str):
-    """Test default_smoke_n INI option"""
+def test_smoke_ini_option_smoke_default_n(pytester: Pytester, option: str):
+    """Test smoke_default_n INI option"""
     num_tests = 10
     default_n = 3
     pytester.makepyfile(generate_test_code(TestFuncSpec(num_params=num_tests)))
     pytester.makeini(f"""
     [pytest]
-    default_smoke_n = {default_n}
+    smoke_default_n = {default_n}
     """)
 
     result = pytester.runpytest(option)
@@ -161,8 +161,8 @@ def test_smoke_ini_option_default_smoke_n(pytester: Pytester, option: str):
 
 
 @pytest.mark.parametrize("option", SMOKE_OPTIONS)
-def test_smoke_ini_option_default_smoke_scope(pytester: Pytester, option: str):
-    """Test default_smoke_scope INI option"""
+def test_smoke_ini_option_smoke_default_scope(pytester: Pytester, option: str):
+    """Test smoke_default_scope INI option"""
     num_tests_1 = 5
     num_tests_2 = 10
     pytester.makepyfile(
@@ -170,7 +170,7 @@ def test_smoke_ini_option_default_smoke_scope(pytester: Pytester, option: str):
     )
     pytester.makeini(f"""
     [pytest]
-    default_smoke_scope = {SmokeScope.FILE}
+    smoke_default_scope = {SmokeScope.FILE}
     """)
     result = pytester.runpytest(option)
     assert result.ret == ExitCode.OK
@@ -208,7 +208,7 @@ def test_smoke_options_are_mutually_exclusive(pytester: Pytester, options: Seque
     result.stderr.re_match_lines(["ERROR: --smoke, --smoke-last, and --smoke-random options are mutually exclusive"])
 
 
-@pytest.mark.parametrize("ini_option", ["default_smoke_n", "default_smoke_scope"])
+@pytest.mark.parametrize("ini_option", [*SmokeIniOption])
 @pytest.mark.parametrize("value", ["foo", ""])
 @pytest.mark.parametrize("option", SMOKE_OPTIONS)
 def test_smoke_ini_option_with_invalid_value(pytester: Pytester, option: str, ini_option: str, value: str):

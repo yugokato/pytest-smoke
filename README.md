@@ -253,10 +253,10 @@ selected.
 You can overwrite the plugin's default values by setting the following options in a configuration 
 file (pytest.ini, pyproject.toml, etc.).  
 
-### `default_smoke_n`
+### `smoke_default_n`
 The default `N` value to be applied when not provided to a smoke option.  
 Plugin default: `1`
 
-### `default_smoke_scope`
+### `smoke_default_scope`
 The default smoke scope to be applied when not explicitly specified with the `--smoke-scope` option.  
 Plugin default: `function`

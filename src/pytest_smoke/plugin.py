@@ -19,8 +19,8 @@ class SmokeScope(StrEnum):
 
 
 class SmokeIniOption(StrEnum):
-    DEFAULT_SMOKE_N = auto()
-    DEFAULT_SMOKE_SCOPE = auto()
+    SMOKE_DEFAULT_N = auto()
+    SMOKE_DEFAULT_SCOPE = auto()
 
 
 class SmokeDefaultN(int): ...
@@ -86,13 +86,13 @@ def pytest_addoption(parser: Parser):
         ),
     )
     parser.addini(
-        SmokeIniOption.DEFAULT_SMOKE_N,
+        SmokeIniOption.SMOKE_DEFAULT_N,
         type="string",
         default=str(DEFAULT_N),
         help="Overwrite the plugin default value for smoke N",
     )
     parser.addini(
-        SmokeIniOption.DEFAULT_SMOKE_SCOPE,
+        SmokeIniOption.SMOKE_DEFAULT_SCOPE,
         type="string",
         default=SmokeScope.FUNCTION,
         help="Overwrite the plugin default value for smoke scope",
@@ -123,7 +123,7 @@ def pytest_collection_modifyitems(config: Config, items: list[Item]):
         if n := config.option.smoke or config.option.smoke_last or config.option.smoke_random:
             if isinstance(n, SmokeDefaultN):
                 # N was not explicitly provided to the option. Apply the INI config value or the plugin default
-                n = _parse_n(config.getini(SmokeIniOption.DEFAULT_SMOKE_N))
+                n = _parse_n(config.getini(SmokeIniOption.SMOKE_DEFAULT_N))
 
             if is_scale := isinstance(n, str) and n.endswith("%"):
                 num_smoke = float(n[:-1])
@@ -132,7 +132,7 @@ def pytest_collection_modifyitems(config: Config, items: list[Item]):
             scope = config.option.smoke_scope
             if scope is None:
                 # --scope-smoke option was not explicitly given. Apply the INI config value or the plugin default
-                scope = _parse_scope(config.getini(SmokeIniOption.DEFAULT_SMOKE_SCOPE))
+                scope = _parse_scope(config.getini(SmokeIniOption.SMOKE_DEFAULT_SCOPE))
             selected_items = []
             deselected_items = []
             counter_collected = Counter(filter(None, (_generate_group_id(item, scope) for item in items)))
