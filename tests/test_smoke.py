@@ -6,11 +6,24 @@ from typing import Optional
 import pytest
 from pytest import ExitCode, Pytester
 
-from pytest_smoke.plugin import SmokeIniOption, SmokeScope
+from pytest_smoke import smoke
+from pytest_smoke.types import SmokeIniOption, SmokeScope
 from pytest_smoke.utils import scale_down
 from tests.helper import TestFileSpec, TestFuncSpec, generate_test_code, get_num_tests, get_num_tests_to_be_selected
 
+if smoke.is_xdist_installed:
+    from xdist.scheduler import LoadScheduling
+
+    from pytest_smoke.extensions.xdist import SmokeScopeScheduling
+
+
+requires_xdist = pytest.mark.skipif(not smoke.is_xdist_installed, reason="pytest-xdist is required")
 SMOKE_OPTIONS = ["--smoke", "--smoke-last", "--smoke-random"]
+SMOKE_INI_OPTIONS = [
+    SmokeIniOption.SMOKE_DEFAULT_N,
+    SmokeIniOption.SMOKE_DEFAULT_SCOPE,
+    pytest.param(SmokeIniOption.SMOKE_XDIST_DIST_BY_SCOPE, marks=requires_xdist),
+]
 
 
 def test_smoke_command_help(pytester: Pytester):
@@ -27,7 +40,9 @@ def test_smoke_command_help(pytester: Pytester):
     ) + r"\n".join(rf"\s+- {scope}: .+" for scope in SmokeScope)
     assert re.search(pattern1, stdout, re.DOTALL)
 
-    pattern2 = r"\[pytest\] ini-options.+" + r"\n".join(rf"  {opt} \([^)]+\):.+" for opt in SmokeIniOption)
+    pattern2 = r"\[pytest\] ini-options.+" + r"\n".join(
+        rf"  {opt} \([^)]+\):\s+\[pytest-smoke\] .+" for opt in SmokeIniOption
+    )
     assert re.search(pattern2, stdout, re.DOTALL)
 
 
@@ -152,7 +167,7 @@ def test_smoke_ini_option_smoke_default_n(pytester: Pytester, option: str):
     pytester.makepyfile(generate_test_code(TestFuncSpec(num_params=num_tests)))
     pytester.makeini(f"""
     [pytest]
-    smoke_default_n = {default_n}
+    {SmokeIniOption.SMOKE_DEFAULT_N} = {default_n}
     """)
 
     result = pytester.runpytest(option)
@@ -170,13 +185,38 @@ def test_smoke_ini_option_smoke_default_scope(pytester: Pytester, option: str):
     )
     pytester.makeini(f"""
     [pytest]
-    smoke_default_scope = {SmokeScope.FILE}
+    {SmokeIniOption.SMOKE_DEFAULT_SCOPE} = {SmokeScope.FILE}
     """)
     result = pytester.runpytest(option)
     assert result.ret == ExitCode.OK
     result.assert_outcomes(passed=1, deselected=num_tests_1 + num_tests_2 - 1)
 
 
+@requires_xdist
+@pytest.mark.parametrize("option", SMOKE_OPTIONS)
+@pytest.mark.parametrize("value", ["true", "false"])
+def test_smoke_ini_option_smoke_xdist_dist_by_scope(pytester: Pytester, option: str, value):
+    """Test smoke_xdist_dist_by_scope INI option"""
+    num_tests_1 = 5
+    num_tests_2 = 10
+    pytester.makepyfile(
+        generate_test_code(TestFileSpec([TestFuncSpec(num_params=num_tests_1), TestFuncSpec(num_params=num_tests_2)]))
+    )
+    pytester.makeini(f"""
+    [pytest]
+    {SmokeIniOption.SMOKE_XDIST_DIST_BY_SCOPE} = {value}
+    """)
+    result = pytester.runpytest(option, "2", "-v", "-n", "2")
+    assert result.ret == ExitCode.OK
+    result.assert_outcomes(passed=4, deselected=num_tests_1 + num_tests_2 - 4)
+    if value == "true":
+        default_scheduler = SmokeScopeScheduling.__name__
+    else:
+        default_scheduler = LoadScheduling.__name__
+    result.stdout.re_match_lines(f"scheduling tests via {default_scheduler}")
+
+
+@pytest.mark.filterwarnings("ignore::pluggy.PluggyTeardownRaisedWarning")
 @pytest.mark.parametrize("n", ["-1", "0", "0.5", "1.1", "foo", " -1%", "0%", "101%", "bar%"])
 @pytest.mark.parametrize("option", SMOKE_OPTIONS)
 def test_smoke_with_invalid_n(pytester: Pytester, option: str, n: str):
@@ -208,7 +248,7 @@ def test_smoke_options_are_mutually_exclusive(pytester: Pytester, options: Seque
     result.stderr.re_match_lines(["ERROR: --smoke, --smoke-last, and --smoke-random options are mutually exclusive"])
 
 
-@pytest.mark.parametrize("ini_option", [*SmokeIniOption])
+@pytest.mark.parametrize("ini_option", SMOKE_INI_OPTIONS)
 @pytest.mark.parametrize("value", ["foo", ""])
 @pytest.mark.parametrize("option", SMOKE_OPTIONS)
 def test_smoke_ini_option_with_invalid_value(pytester: Pytester, option: str, ini_option: str, value: str):
@@ -218,5 +258,20 @@ def test_smoke_ini_option_with_invalid_value(pytester: Pytester, option: str, in
     [pytest]
     {ini_option} = {value}
     """)
-    result = pytester.runpytest(option)
+    args = [option]
+    if ini_option == SmokeIniOption.SMOKE_XDIST_DIST_BY_SCOPE:
+        args.extend(["-n", "2"])
+    result = pytester.runpytest(*args)
     assert result.ret == ExitCode.USAGE_ERROR
+
+
+@requires_xdist
+@pytest.mark.parametrize("option", SMOKE_OPTIONS)
+def test_smoke_with_xdist_disabled(pytester: Pytester, option: str):
+    """Test that pytest-smoke does not access the pytest-xdist plugin when it is explicitly disabled"""
+    num_tests = 10
+    pytester.makepyfile(generate_test_code(TestFuncSpec(num_params=num_tests)))
+    args = [option, "-p", "no:xdist"]
+    result = pytester.runpytest(*args)
+    assert result.ret == ExitCode.OK
+    result.assert_outcomes(passed=1, deselected=num_tests - 1)

@@ -23,8 +23,9 @@ pip install pytest-smoke
 
 ## Usage
 
-The plugin provides the following options, allowing you to limit the amount of tests to run (`N`) and optionally specify 
- the scope at which `N` is applied:
+The plugin provides the following options to limit the amount of tests to run (`N`, default=`1`) and optionally specify 
+the scope at which `N` is applied.    
+If provided, the value of `N` can be either a number (e.g., `5`) or a percentage (e.g., `10%`). 
 ```
 $ pytest -h
 
@@ -44,10 +45,9 @@ Smoke testing:
                         NOTE: You can also implement your own custom scopes using a hook
 ```
 
-> - The value of `N` can be a number (e.g. `5`) or a percentage (e.g. `10%`)
-> - If `N` is not explicitly specified, the default value of `1` will be used
-> - The `--smoke-scope` option supports any custom values, as long as they are handled in the hook
-> - You can overwrite the plugin's default value for `N` and `SCOPE` using INI options. See the "INI Options" section below
+> - The `--smoke-scope` option also supports any custom values, as long as they are handled in the hook
+> - You can override the plugin's default value for `N` and `SCOPE` using INI options. See the "INI Options" section below
+> - When using the `pytest-xdist` plugin for parallel testing, you can configure the `pytest-smoke` plugin to enable a custom distribution algorithm that distributes tests based on the smoke scope
 
 
 ## Examples
@@ -234,7 +234,7 @@ tests/test_something.py::test_something3[17] PASSED              [100%]
 The plugin provides the following hooks to customize or extend the plugin's capabilities: 
 
 ### `pytest_smoke_generate_group_id(item, scope)`
-This hook allows you to implement your own custom scopes for the `--scope-smoke` option, or overwrite the logic of the 
+This hook allows you to implement your own custom scopes for the `--smoke-scope` option, or override the logic of the 
 predefined scopes. Items with the same group ID are grouped together and are considered to be in the same scope, 
 at which `N` is applied. Any custom values passed to the  `--smoke-scope` option must be handled in this hook.
 
@@ -250,7 +250,7 @@ selected.
 
 ## INI Options
 
-You can overwrite the plugin's default values by setting the following options in a configuration 
+You can override the plugin's default values by setting the following options in a configuration 
 file (pytest.ini, pyproject.toml, etc.).  
 
 ### `smoke_default_n`
@@ -260,3 +260,9 @@ Plugin default: `1`
 ### `smoke_default_scope`
 The default smoke scope to be applied when not explicitly specified with the `--smoke-scope` option.  
 Plugin default: `function`
+
+### `smoke_xdist_dist_by_scope`
+When using the `pytest-xdist` plugin (>=2.3.0) for parallel testing, a custom distribution algorithm that 
+distributes tests based on the smoke scope can be enabled. The custom scheduler will be automatically used when 
+the `-n`/`--numprocesses` option is used.   
+Plugin default: `false`

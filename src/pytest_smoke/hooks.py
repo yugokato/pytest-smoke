@@ -5,7 +5,7 @@ from pytest import Item, hookspec
 def pytest_smoke_generate_group_id(item: Item, scope: str):
     """Return a smoke scope group ID for the predefined or custom scopes
 
-    Use this hook to either overwrite the logic of the predefined scopes or to implement logic for your own scopes
+    Use this hook to either override the logic of the predefined scopes or to implement logic for your own scopes
     NOTE: Any custom scopes given to the --smoke-scope option must be handled in this hook
     """
 

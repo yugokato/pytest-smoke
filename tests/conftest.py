@@ -1,7 +1,14 @@
+import os
+
 import pytest
 from pytest import Pytester
 
-from pytest_smoke.utils import StrEnum
+from pytest_smoke import smoke
+
+if os.environ.get("IGNORE_XDIST") == "true":
+    smoke.is_xdist_installed = False
+
+from pytest_smoke.types import StrEnum
 from tests.helper import TestClassSpec, TestFileSpec, TestFuncSpec, generate_test_code
 
 pytest_plugins = "pytester"
