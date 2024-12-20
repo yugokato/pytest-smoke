@@ -1,32 +1,29 @@
+import os
 import random
 from collections import Counter
-from enum import auto
-from functools import lru_cache
-from typing import Optional, Union
+from dataclasses import dataclass, field
+from uuid import UUID, uuid4
 
 import pytest
-from pytest import Config, Item, Parser, PytestPluginManager
+from pytest import Config, Item, Parser, PytestPluginManager, Session
 
-from pytest_smoke.utils import StrEnum, scale_down
+from pytest_smoke import smoke
+from pytest_smoke.types import SmokeDefaultN, SmokeEnvVar, SmokeIniOption, SmokeScope
+from pytest_smoke.utils import generate_group_id, get_scope, parse_ini_option, parse_n, parse_scope, scale_down
 
+if smoke.is_xdist_installed:
+    from xdist import is_xdist_controller, is_xdist_worker
 
-class SmokeScope(StrEnum):
-    FUNCTION = auto()
-    CLASS = auto()
-    AUTO = auto()
-    FILE = auto()
-    ALL = auto()
-
-
-class SmokeIniOption(StrEnum):
-    SMOKE_DEFAULT_N = auto()
-    SMOKE_DEFAULT_SCOPE = auto()
-
-
-class SmokeDefaultN(int): ...
+    from pytest_smoke.extensions.xdist import PytestSmokeXdist
 
 
 DEFAULT_N = SmokeDefaultN(1)
+
+
+@dataclass
+class SmokeGroupIDCounter:
+    collected: Counter = field(default_factory=Counter)
+    sellected: Counter = field(default_factory=Counter)
 
 
 @pytest.hookimpl(trylast=True)
@@ -43,7 +40,7 @@ def pytest_addoption(parser: Parser):
         dest="smoke",
         metavar="N",
         const=DEFAULT_N,
-        type=_parse_n,
+        type=parse_n,
         nargs="?",
         default=False,
         help="Run the first N (default=1) tests from each test function or specified scope",
@@ -53,7 +50,7 @@ def pytest_addoption(parser: Parser):
         dest="smoke_last",
         metavar="N",
         const=DEFAULT_N,
-        type=_parse_n,
+        type=parse_n,
         nargs="?",
         default=False,
         help="Run the last N (default=1) tests from each test function or specified scope",
@@ -63,7 +60,7 @@ def pytest_addoption(parser: Parser):
         dest="smoke_random",
         metavar="N",
         const=DEFAULT_N,
-        type=_parse_n,
+        type=parse_n,
         nargs="?",
         default=False,
         help="Run N (default=1) randomly selected tests from each test function or specified scope",
@@ -72,7 +69,7 @@ def pytest_addoption(parser: Parser):
         "--smoke-scope",
         dest="smoke_scope",
         metavar="SCOPE",
-        type=_parse_scope,
+        type=parse_scope,
         help=(
             "Specify the scope at which the value of N from the above options is applied.\n"
             "The plugin provides the following predefined scopes:\n"
@@ -85,17 +82,25 @@ def pytest_addoption(parser: Parser):
             "NOTE: You can also implement your own custom scopes using a hook"
         ),
     )
+
     parser.addini(
         SmokeIniOption.SMOKE_DEFAULT_N,
         type="string",
         default=str(DEFAULT_N),
-        help="Overwrite the plugin default value for smoke N",
+        help="[pytest-smoke] Override the plugin default value for smoke N",
     )
     parser.addini(
         SmokeIniOption.SMOKE_DEFAULT_SCOPE,
         type="string",
         default=SmokeScope.FUNCTION,
-        help="Overwrite the plugin default value for smoke scope",
+        help="[pytest-smoke] Override the plugin default value for smoke scope",
+    )
+    parser.addini(
+        SmokeIniOption.SMOKE_XDIST_DIST_BY_SCOPE,
+        type="bool",
+        default=False,
+        help="[pytest-smoke] When using the pytest-xdist plugin for parallel testing, a custom distribution algorithm "
+        "that distributes tests based on the smoke scope can be enabled",
     )
 
 
@@ -111,35 +116,53 @@ def pytest_configure(config: Config):
             "The --smoke-scope option requires one of --smoke, --smoke-last, or --smoke-random to be specified"
         )
 
+    if smoke.is_xdist_installed:
+        if config.pluginmanager.has_plugin("xdist"):
+            # Register the smoke-xdist plugin if -n/--numprocesses option is given.
+            if smoke.is_xdist_installed and config.getoption("numprocesses", default=None):
+                config.pluginmanager.register(PytestSmokeXdist(), name=PytestSmokeXdist.name)
+        else:
+            smoke.is_xdist_installed = False
+
+
+@pytest.hookimpl(wrapper=True, tryfirst=True)
+def pytest_sessionstart(session: Session):
+    if not smoke.is_xdist_installed or is_xdist_controller(session):
+        os.environ[SmokeEnvVar.SMOKE_TEST_SESSION_UUID] = str(uuid4())
+    return (yield)
+
 
 @pytest.hookimpl(wrapper=True, trylast=True)
-def pytest_collection_modifyitems(config: Config, items: list[Item]):
+def pytest_collection_modifyitems(session: Session, config: Config, items: list[Item]):
     try:
         return (yield)
     finally:
         if not items:
             return
 
-        if n := config.option.smoke or config.option.smoke_last or config.option.smoke_random:
+        if n := (config.option.smoke or config.option.smoke_last or config.option.smoke_random):
             if isinstance(n, SmokeDefaultN):
                 # N was not explicitly provided to the option. Apply the INI config value or the plugin default
-                n = _parse_n(config.getini(SmokeIniOption.SMOKE_DEFAULT_N))
+                n = parse_ini_option(config, SmokeIniOption.SMOKE_DEFAULT_N)
 
             if is_scale := isinstance(n, str) and n.endswith("%"):
                 num_smoke = float(n[:-1])
             else:
                 num_smoke = n
-            scope = config.option.smoke_scope
-            if scope is None:
-                # --scope-smoke option was not explicitly given. Apply the INI config value or the plugin default
-                scope = _parse_scope(config.getini(SmokeIniOption.SMOKE_DEFAULT_SCOPE))
+            scope = get_scope(config)
             selected_items = []
             deselected_items = []
-            counter_collected = Counter(filter(None, (_generate_group_id(item, scope) for item in items)))
-            counter_selected = Counter()
+            counter = SmokeGroupIDCounter(
+                collected=Counter(filter(None, (generate_group_id(item, scope) for item in items)))
+            )
             smoke_groups_reached_threshold = set()
             if config.option.smoke_random:
-                items_to_filter = random.sample(items, len(items))
+                if smoke.is_xdist_installed and (is_xdist_controller(session) or is_xdist_worker(session)):
+                    # Set the seed to ensure XDIST controler and workers collect the same items
+                    random_ = random.Random(UUID(os.environ[SmokeEnvVar.SMOKE_TEST_SESSION_UUID]).time)
+                else:
+                    random_ = random
+                items_to_filter = random_.sample(items, len(items))
             elif config.option.smoke_last:
                 items_to_filter = items[::-1]
             else:
@@ -151,92 +174,23 @@ def pytest_collection_modifyitems(config: Config, items: list[Item]):
                     selected_items.append(item)
                     continue
 
-                group_id = _generate_group_id(item, scope)
+                group_id = generate_group_id(item, scope)
                 if group_id is None or group_id in smoke_groups_reached_threshold:
                     deselected_items.append(item)
                     continue
 
-                if is_scale:
-                    num_tests = counter_collected[group_id]
-                    threshold = scale_down(num_tests, num_smoke)
-                else:
-                    threshold = num_smoke
-
-                if counter_selected[group_id] < threshold:
-                    counter_selected.update([group_id])
+                threshold = scale_down(counter.collected[group_id], num_smoke) if is_scale else num_smoke
+                if counter.sellected[group_id] < threshold:
+                    counter.sellected.update([group_id])
                     selected_items.append(item)
                 else:
                     smoke_groups_reached_threshold.add(group_id)
                     deselected_items.append(item)
 
-            if len(selected_items) < len(items):
+            if deselected_items:
+                config.hook.pytest_deselected(items=deselected_items)
                 if config.option.smoke_random or config.option.smoke_last:
                     # retain the original test order
                     selected_items.sort(key=lambda x: items.index(x))
-
                 items.clear()
                 items.extend(selected_items)
-                config.hook.pytest_deselected(items=deselected_items)
-
-
-def _parse_n(value: str) -> Union[int, str]:
-    v = value.strip()
-    try:
-        if is_scale := v.endswith("%"):
-            num = float(v[:-1])
-        else:
-            num = int(v)
-
-        if num < 1 or is_scale and num > 100:
-            raise ValueError
-
-        if is_scale:
-            return f"{num}%"
-        else:
-            return num
-    except ValueError:
-        raise pytest.UsageError(
-            f"The smoke N value must be a positive number or a valid percentage. '{value}' was given."
-        )
-
-
-def _parse_scope(value: str) -> str:
-    if (v := value.strip()) == "":
-        raise pytest.UsageError(f"Invalid scope: '{value}'")
-    return v
-
-
-@lru_cache
-def _generate_group_id(item: Item, scope: str) -> Optional[str]:
-    if item.config.hook.pytest_smoke_exclude(item=item, scope=scope):
-        return
-
-    if (group_id := item.config.hook.pytest_smoke_generate_group_id(item=item, scope=scope)) is not None:
-        return group_id
-
-    if scope not in [str(x) for x in SmokeScope]:
-        raise pytest.UsageError(
-            f"The logic for the custom scope '{scope}' must be implemented using the "
-            f"pytest_smoke_generate_group_id hook"
-        )
-
-    if scope == SmokeScope.ALL:
-        return "*"
-
-    cls = getattr(item, "cls", None)
-    if not cls and scope == SmokeScope.CLASS:
-        return
-
-    group_id = str(item.path or item.location[0])
-    if scope == SmokeScope.FILE:
-        return group_id
-
-    if cls:
-        group_id += f"::{cls.__name__}"
-        if scope in [SmokeScope.CLASS, SmokeScope.AUTO]:
-            return group_id
-
-    # The default scope
-    func_name = item.function.__name__  # type: ignore
-    group_id += f"::{func_name}"
-    return group_id

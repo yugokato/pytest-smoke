@@ -46,4 +46,4 @@ jobs:
     - name: Test
       shell: bash
       run: |
-        tox -e py --installpkg `find dist/*.tar.gz`
+        tox -e py,xdist --installpkg `find dist/*.tar.gz`
