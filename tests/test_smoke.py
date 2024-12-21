@@ -9,7 +9,14 @@ from pytest import ExitCode, Pytester
 from pytest_smoke import smoke
 from pytest_smoke.types import SmokeIniOption, SmokeScope
 from pytest_smoke.utils import scale_down
-from tests.helper import TestFileSpec, TestFuncSpec, generate_test_code, get_num_tests, get_num_tests_to_be_selected
+from tests.helper import (
+    TEST_NAME_BASE,
+    TestFileSpec,
+    TestFuncSpec,
+    generate_test_code,
+    get_num_tests,
+    get_num_tests_to_be_selected,
+)
 
 if smoke.is_xdist_installed:
     from xdist.scheduler import LoadScheduling
@@ -22,7 +29,7 @@ SMOKE_OPTIONS = ["--smoke", "--smoke-last", "--smoke-random"]
 SMOKE_INI_OPTIONS = [
     SmokeIniOption.SMOKE_DEFAULT_N,
     SmokeIniOption.SMOKE_DEFAULT_SCOPE,
-    pytest.param(SmokeIniOption.SMOKE_XDIST_DIST_BY_SCOPE, marks=requires_xdist),
+    pytest.param(SmokeIniOption.SMOKE_DEFAULT_XDIST_DIST_BY_SCOPE, marks=requires_xdist),
 ]
 
 
@@ -194,26 +201,49 @@ def test_smoke_ini_option_smoke_default_scope(pytester: Pytester, option: str):
 
 @requires_xdist
 @pytest.mark.parametrize("option", SMOKE_OPTIONS)
-@pytest.mark.parametrize("value", ["true", "false"])
-def test_smoke_ini_option_smoke_xdist_dist_by_scope(pytester: Pytester, option: str, value):
-    """Test smoke_xdist_dist_by_scope INI option"""
-    num_tests_1 = 5
-    num_tests_2 = 10
-    pytester.makepyfile(
-        generate_test_code(TestFileSpec([TestFuncSpec(num_params=num_tests_1), TestFuncSpec(num_params=num_tests_2)]))
-    )
-    pytester.makeini(f"""
-    [pytest]
-    {SmokeIniOption.SMOKE_XDIST_DIST_BY_SCOPE} = {value}
-    """)
-    result = pytester.runpytest(option, "2", "-v", "-n", "2")
+@pytest.mark.parametrize("dist", [None, "load"])
+@pytest.mark.parametrize("value", ["true", "false", None])
+def test_smoke_ini_option_smoke_default_xdist_dist_by_scope(pytester: Pytester, option: str, value: str, dist: str):
+    """Test smoke_default_xdist_dist_by_scope INI option. The custom scheduler should be used only when the INI option
+    value is true and when --dist option is not given
+    """
+    num_tests_1 = 123
+    num_tests_2 = 456
+    test_file_spec = TestFileSpec([TestFuncSpec(num_params=num_tests_1), TestFuncSpec(num_params=num_tests_2)])
+    num_test_func = len(test_file_spec.test_specs)
+    smoke_n = 100
+    pytester.makepyfile(test_xdist=generate_test_code(test_file_spec))
+    if value:
+        pytester.makeini(f"""
+        [pytest]
+        {SmokeIniOption.SMOKE_DEFAULT_XDIST_DIST_BY_SCOPE} = {value}
+        """)
+    args = [option, str(smoke_n), "-v", "-n", "2"]
+    if dist:
+        args.extend(["--dist", dist])
+    result = pytester.runpytest(*args)
     assert result.ret == ExitCode.OK
-    result.assert_outcomes(passed=4, deselected=num_tests_1 + num_tests_2 - 4)
-    if value == "true":
-        default_scheduler = SmokeScopeScheduling.__name__
+    num_passed = num_test_func * smoke_n
+    result.assert_outcomes(passed=num_passed, deselected=num_tests_1 + num_tests_2 - num_passed)
+
+    if dist is None and value == "true":
+        expected_scheduler = SmokeScopeScheduling
     else:
-        default_scheduler = LoadScheduling.__name__
-    result.stdout.re_match_lines(f"scheduling tests via {default_scheduler}")
+        expected_scheduler = LoadScheduling
+
+    result.stdout.re_match_lines(f"scheduling tests via {expected_scheduler.__name__}")
+    test_ids_worker1 = re.findall(rf"\[gw0\].+PASSED (test_xdist\.py::{TEST_NAME_BASE}\d)\[\d+\]", str(result.stdout))
+    test_ids_worker2 = re.findall(rf"\[gw1\].+PASSED (test_xdist\.py::{TEST_NAME_BASE}\d)\[\d+\]", str(result.stdout))
+    assert test_ids_worker1 and test_ids_worker2
+    assert len(test_ids_worker1) + len(test_ids_worker2) == num_passed
+    for test_ids in (test_ids_worker1, test_ids_worker2):
+        if expected_scheduler == SmokeScopeScheduling:
+            # Since the default smoke scope is function, each worker processes tests only for single test function
+            assert len(test_ids) == smoke_n
+            assert len(set(test_ids)) == 1
+        else:
+            # Tests should be distributed from both test functions
+            assert len(set(test_ids)) == num_test_func
 
 
 @pytest.mark.filterwarnings("ignore::pluggy.PluggyTeardownRaisedWarning")
@@ -259,7 +289,7 @@ def test_smoke_ini_option_with_invalid_value(pytester: Pytester, option: str, in
     {ini_option} = {value}
     """)
     args = [option]
-    if ini_option == SmokeIniOption.SMOKE_XDIST_DIST_BY_SCOPE:
+    if ini_option == SmokeIniOption.SMOKE_DEFAULT_XDIST_DIST_BY_SCOPE:
         args.extend(["-n", "2"])
     result = pytester.runpytest(*args)
     assert result.ret == ExitCode.USAGE_ERROR

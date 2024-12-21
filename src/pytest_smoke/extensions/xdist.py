@@ -9,7 +9,10 @@ if smoke.is_xdist_installed:
     from xdist.scheduler import LoadScopeScheduling
 
     class PytestSmokeXdist:
-        """A plugin that extends pytest-smoke to seamlesslly support pytest-xdist"""
+        """A plugin that extends pytest-smoke to seamlesslly support pytest-xdist
+
+        This plugin will be dynamically registered when the -n/--numprocesses option is given
+        """
 
         name = "smoke-xdist"
 
@@ -23,7 +26,14 @@ if smoke.is_xdist_installed:
                 return True
 
         def pytest_xdist_make_scheduler(self, config: Config, log):
-            if parse_ini_option(config, SmokeIniOption.SMOKE_XDIST_DIST_BY_SCOPE):
+            """Replace the pytest-xdist default scheduler (load) with our custom scheduler (smoke scope) when the
+            following conditions match:
+            - The INI option value is set to true
+            - --dist option is not given
+            """
+            if config.known_args_namespace.dist == "no" and parse_ini_option(
+                config, SmokeIniOption.SMOKE_DEFAULT_XDIST_DIST_BY_SCOPE
+            ):
                 return SmokeScopeScheduling(config, log, nodes=self._nodes)
 
     class SmokeScopeScheduling(LoadScopeScheduling):
