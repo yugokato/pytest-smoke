@@ -28,7 +28,7 @@ class SmokeScope(StrEnum):
 class SmokeIniOption(StrEnum):
     SMOKE_DEFAULT_N = auto()
     SMOKE_DEFAULT_SCOPE = auto()
-    SMOKE_XDIST_DIST_BY_SCOPE = auto()
+    SMOKE_DEFAULT_XDIST_DIST_BY_SCOPE = auto()
 
 
 class SmokeDefaultN(int): ...

@@ -47,7 +47,7 @@ Smoke testing:
 
 > - The `--smoke-scope` option also supports any custom values, as long as they are handled in the hook
 > - You can override the plugin's default value for `N` and `SCOPE` using INI options. See the "INI Options" section below
-> - When using the `pytest-xdist` plugin for parallel testing, you can configure the `pytest-smoke` plugin to enable a custom distribution algorithm that distributes tests based on the smoke scope
+> - When using the `pytest-xdist` plugin for parallel testing, you can configure the `pytest-smoke` plugin to replace the default scheduler with a custom distribution algorithm that distributes tests based on the smoke scope
 
 
 ## Examples
@@ -261,8 +261,8 @@ Plugin default: `1`
 The default smoke scope to be applied when not explicitly specified with the `--smoke-scope` option.  
 Plugin default: `function`
 
-### `smoke_xdist_dist_by_scope`
-When using the `pytest-xdist` plugin (>=2.3.0) for parallel testing, a custom distribution algorithm that 
-distributes tests based on the smoke scope can be enabled. The custom scheduler will be automatically used when 
-the `-n`/`--numprocesses` option is used.   
+### `smoke_default_xdist_dist_by_scope`
+When using the `pytest-xdist` plugin (>=2.3.0) for parallel testing, this option replaces the default scheduler with a 
+custom distribution algorithm that distributes tests based on the smoke scope. The custom scheduler will be 
+automatically used when the `-n`/`--numprocesses` option is used without the `--dist` option.   
 Plugin default: `false`
