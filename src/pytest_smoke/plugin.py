@@ -96,11 +96,11 @@ def pytest_addoption(parser: Parser):
         help="[pytest-smoke] Override the plugin default value for smoke scope",
     )
     parser.addini(
-        SmokeIniOption.SMOKE_XDIST_DIST_BY_SCOPE,
+        SmokeIniOption.SMOKE_DEFAULT_XDIST_DIST_BY_SCOPE,
         type="bool",
         default=False,
-        help="[pytest-smoke] When using the pytest-xdist plugin for parallel testing, a custom distribution algorithm "
-        "that distributes tests based on the smoke scope can be enabled",
+        help="[pytest-smoke] When using the pytest-xdist plugin for parallel testing, replace the default scheduler "
+        "with a custom distribution algorithm that distributes tests based on the smoke scope",
     )
 
 
@@ -119,7 +119,7 @@ def pytest_configure(config: Config):
     if smoke.is_xdist_installed:
         if config.pluginmanager.has_plugin("xdist"):
             # Register the smoke-xdist plugin if -n/--numprocesses option is given.
-            if smoke.is_xdist_installed and config.getoption("numprocesses", default=None):
+            if config.getoption("numprocesses", default=None):
                 config.pluginmanager.register(PytestSmokeXdist(), name=PytestSmokeXdist.name)
         else:
             smoke.is_xdist_installed = False
