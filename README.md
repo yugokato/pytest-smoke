@@ -264,5 +264,5 @@ Plugin default: `function`
 ### `smoke_default_xdist_dist_by_scope`
 When using the `pytest-xdist` plugin (>=2.3.0) for parallel testing, this option replaces the default scheduler with a 
 custom distribution algorithm that distributes tests based on the smoke scope. The custom scheduler will be 
-automatically used when the `-n`/`--numprocesses` option is used without the `--dist` option.   
+automatically used when the `-n`/`--numprocesses` option is used without a dist option (`--dist` or `-d`).  
 Plugin default: `false`

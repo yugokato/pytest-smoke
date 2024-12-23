@@ -246,13 +246,15 @@ def test_smoke_ini_option_smoke_default_scope(pytester: Pytester, option: str):
 
 @requires_xdist
 @pytest.mark.parametrize("option", SMOKE_OPTIONS)
-@pytest.mark.parametrize("dist", [None, "load"])
+@pytest.mark.parametrize("dist_option", [None, "--dist=load", "-d"])
 @pytest.mark.parametrize("value", ["true", "false", None])
-def test_smoke_ini_option_smoke_default_xdist_dist_by_scope(pytester: Pytester, option: str, value: str, dist: str):
+def test_smoke_ini_option_smoke_default_xdist_dist_by_scope(
+    pytester: Pytester, option: str, value: str, dist_option: str
+):
     """Test smoke_default_xdist_dist_by_scope INI option.
 
     The plugin should extend the pytest-xdist to use the custom scheduler when the INI option value is true and
-    when --dist option is not given
+    when no dist option (--dist or -d) is explicitly given
     """
     num_tests_1 = 123
     num_tests_2 = 456
@@ -266,12 +268,12 @@ def test_smoke_ini_option_smoke_default_xdist_dist_by_scope(pytester: Pytester, 
         {SmokeIniOption.SMOKE_DEFAULT_XDIST_DIST_BY_SCOPE} = {value}
         """)
     args = [option, str(smoke_n), "-v", "-n", "2"]
-    if dist:
-        args.extend(["--dist", dist])
+    if dist_option:
+        args.append(dist_option)
 
     result = pytester.runpytest(*args)
     assert result.ret == ExitCode.OK
-    expected_scheduler = SmokeScopeScheduling if dist is None and value == "true" else LoadScheduling
+    expected_scheduler = SmokeScopeScheduling if dist_option is None and value == "true" else LoadScheduling
     result.stdout.re_match_lines(f"scheduling tests via {expected_scheduler.__name__}")
     num_passed = num_test_func * smoke_n
     result.assert_outcomes(passed=num_passed, deselected=num_tests_1 + num_tests_2 - num_passed)

@@ -29,10 +29,12 @@ if smoke.is_xdist_installed:
             """Replace the pytest-xdist default scheduler (load) with our custom scheduler (smoke scope) when the
             following conditions match:
             - The INI option value is set to true
-            - --dist option is not given
+            - No dist option (--dist or -d) is explicitly given
             """
-            if config.known_args_namespace.dist == "no" and parse_ini_option(
-                config, SmokeIniOption.SMOKE_DEFAULT_XDIST_DIST_BY_SCOPE
+            if (
+                config.known_args_namespace.dist == "no"
+                and not config.known_args_namespace.distload
+                and parse_ini_option(config, SmokeIniOption.SMOKE_DEFAULT_XDIST_DIST_BY_SCOPE)
             ):
                 return SmokeScopeScheduling(config, log, nodes=self._nodes)
 
