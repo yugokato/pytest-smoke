@@ -127,7 +127,7 @@ def pytest_configure(config: Config):
 
 @pytest.hookimpl(wrapper=True, tryfirst=True)
 def pytest_sessionstart(session: Session):
-    if not smoke.is_xdist_installed or is_xdist_controller(session):
+    if not smoke.is_xdist_installed or not is_xdist_worker(session):
         os.environ[SmokeEnvVar.SMOKE_TEST_SESSION_UUID] = str(uuid4())
     return (yield)
 
