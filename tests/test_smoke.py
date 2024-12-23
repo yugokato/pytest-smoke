@@ -9,10 +9,17 @@ from pytest import ExitCode, Pytester
 from pytest_smoke import smoke
 from pytest_smoke.types import SmokeIniOption, SmokeScope
 from pytest_smoke.utils import scale_down
-from tests.helper import TestFileSpec, TestFuncSpec, generate_test_code, get_num_tests, get_num_tests_to_be_selected
+from tests.helper import (
+    TEST_NAME_BASE,
+    TestFileSpec,
+    TestFuncSpec,
+    generate_test_code,
+    get_num_tests,
+    get_num_tests_to_be_selected,
+)
 
 if smoke.is_xdist_installed:
-    from xdist.scheduler import LoadScheduling, LoadScopeScheduling
+    from xdist.scheduler import LoadScheduling
 
     from pytest_smoke.extensions.xdist import SmokeScopeScheduling
 
@@ -47,17 +54,26 @@ def test_smoke_command_help(pytester: Pytester):
 
 
 @pytest.mark.usefixtures("generate_test_files")
+def test_smoke_no_option(pytester: Pytester, test_file_specs: list[TestFileSpec]):
+    """Test the plugin does not affect pytest when no plugin options are given"""
+    num_all_tests = get_num_tests(*test_file_specs)
+    result = pytester.runpytest("-n", "2")
+    assert result.ret == ExitCode.OK
+    result.assert_outcomes(passed=num_all_tests)
+
+
+@pytest.mark.usefixtures("generate_test_files")
 @pytest.mark.parametrize("scope", [None, *SmokeScope])
 @pytest.mark.parametrize("n", [None, "1", "5", "15", "25", "35", str(2**32 - 1), "1%", "1.23%", "10%", "33%", "100%"])
 @pytest.mark.parametrize("option", SMOKE_OPTIONS)
-def test_smoke_with_valid_n(
+def test_smoke_n(
     pytester: Pytester,
     test_file_specs: list[TestFileSpec],
     option: str,
     n: Optional[str],
     scope: Optional[str],
 ):
-    """Test all combinations of smoke options and predefined scopes with various N values"""
+    """Test all combinations of plugin options with various smoke N values"""
     num_all_tests = get_num_tests(*test_file_specs)
     num_tests_to_be_selected = get_num_tests_to_be_selected(test_file_specs, n, scope)
     args = [option]
@@ -68,6 +84,42 @@ def test_smoke_with_valid_n(
     result = pytester.runpytest(*args)
     assert result.ret == ExitCode.OK
     result.assert_outcomes(passed=num_tests_to_be_selected, deselected=num_all_tests - num_tests_to_be_selected)
+
+
+@requires_xdist
+@pytest.mark.usefixtures("generate_test_files")
+@pytest.mark.parametrize("scope", [None, *SmokeScope])
+@pytest.mark.parametrize("option", SMOKE_OPTIONS)
+def test_smoke_xdist(pytester: Pytester, test_file_specs: list[TestFileSpec], option: str, scope: Optional[str]):
+    """Test basic plugin functionality with pytest-xdist.
+
+    The plugin should handle the following points:
+    - Report the number of deselected tests in xdist controller
+    - smoke-random: Sets a common random seeds so that all workers can collect the exact same tests
+    """
+    smoke_n = "3"
+    num_all_tests = get_num_tests(*test_file_specs)
+    num_tests_to_be_selected = get_num_tests_to_be_selected(test_file_specs, str(smoke_n), scope)
+    args = [option, smoke_n, "-n", "2", "-v"]
+    if scope:
+        args.extend(["--smoke-scope", scope])
+    result = pytester.runpytest(*args)
+    assert result.ret == ExitCode.OK
+    result.assert_outcomes(passed=num_tests_to_be_selected, deselected=num_all_tests - num_tests_to_be_selected)
+
+
+@requires_xdist
+@pytest.mark.parametrize("option", SMOKE_OPTIONS)
+def test_smoke_xdist_disabled(pytester: Pytester, option: str):
+    """Test that pytest-smoke does not access the pytest-xdist plugin when it is install but explicitly disabled"""
+    assert smoke.is_xdist_installed
+    num_tests = 10
+    pytester.makepyfile(generate_test_code(TestFuncSpec(num_params=num_tests)))
+    args = [option, "-p", "no:xdist"]
+    result = pytester.runpytest(*args)
+    assert result.ret == ExitCode.OK
+    assert not smoke.is_xdist_installed
+    result.assert_outcomes(passed=1, deselected=num_tests - 1)
 
 
 @pytest.mark.parametrize("with_hook", [True, False])
@@ -194,46 +246,54 @@ def test_smoke_ini_option_smoke_default_scope(pytester: Pytester, option: str):
 
 @requires_xdist
 @pytest.mark.parametrize("option", SMOKE_OPTIONS)
-@pytest.mark.parametrize("dist", [None, "load", "loadscope"])
-@pytest.mark.parametrize("value", ["true", "false"])
+@pytest.mark.parametrize("dist", [None, "load"])
+@pytest.mark.parametrize("value", ["true", "false", None])
 def test_smoke_ini_option_smoke_default_xdist_dist_by_scope(pytester: Pytester, option: str, value: str, dist: str):
-    """Test smoke_default_xdist_dist_by_scope INI option. The custom scheduler should be used only when the INI option
-    value is true and when --dist option is not given
+    """Test smoke_default_xdist_dist_by_scope INI option.
+
+    The plugin should extend the pytest-xdist to use the custom scheduler when the INI option value is true and
+    when --dist option is not given
     """
-    num_tests_1 = 5
-    num_tests_2 = 10
-    smoke_n = 2
+    num_tests_1 = 123
+    num_tests_2 = 456
     test_file_spec = TestFileSpec([TestFuncSpec(num_params=num_tests_1), TestFuncSpec(num_params=num_tests_2)])
-    pytester.makepyfile(generate_test_code(test_file_spec))
-    pytester.makeini(f"""
-    [pytest]
-    {SmokeIniOption.SMOKE_DEFAULT_XDIST_DIST_BY_SCOPE} = {value}
-    """)
+    num_test_func = len(test_file_spec.test_specs)
+    smoke_n = 100
+    pytester.makepyfile(test_xdist=generate_test_code(test_file_spec))
+    if value:
+        pytester.makeini(f"""
+        [pytest]
+        {SmokeIniOption.SMOKE_DEFAULT_XDIST_DIST_BY_SCOPE} = {value}
+        """)
     args = [option, str(smoke_n), "-v", "-n", "2"]
     if dist:
         args.extend(["--dist", dist])
+
     result = pytester.runpytest(*args)
     assert result.ret == ExitCode.OK
-    num_passed = len(test_file_spec.test_specs) * smoke_n
+    expected_scheduler = SmokeScopeScheduling if dist is None and value == "true" else LoadScheduling
+    result.stdout.re_match_lines(f"scheduling tests via {expected_scheduler.__name__}")
+    num_passed = num_test_func * smoke_n
     result.assert_outcomes(passed=num_passed, deselected=num_tests_1 + num_tests_2 - num_passed)
 
-    if dist == "load":
-        scheduler = LoadScheduling.__name__
-    elif dist == "loadscope":
-        scheduler = LoadScopeScheduling.__name__
-    else:
-        if value == "true":
-            scheduler = SmokeScopeScheduling.__name__
+    test_ids_worker1 = re.findall(rf"\[gw0\].+PASSED (test_xdist\.py::{TEST_NAME_BASE}\d)\[\d+\]", str(result.stdout))
+    test_ids_worker2 = re.findall(rf"\[gw1\].+PASSED (test_xdist\.py::{TEST_NAME_BASE}\d)\[\d+\]", str(result.stdout))
+    assert test_ids_worker1 and test_ids_worker2
+    assert len(test_ids_worker1) + len(test_ids_worker2) == num_passed
+    for test_ids in (test_ids_worker1, test_ids_worker2):
+        if expected_scheduler == SmokeScopeScheduling:
+            # Since the default smoke scope is function, each worker processes tests only for single test function
+            assert len(test_ids) == smoke_n
+            assert len(set(test_ids)) == 1
         else:
-            # pytest-xdist default
-            scheduler = LoadScheduling.__name__
-    result.stdout.re_match_lines(f"scheduling tests via {scheduler}")
+            # Tests should be distributed from both test functions
+            assert len(set(test_ids)) == num_test_func
 
 
 @pytest.mark.filterwarnings("ignore::pluggy.PluggyTeardownRaisedWarning")
 @pytest.mark.parametrize("n", ["-1", "0", "0.5", "1.1", "foo", " -1%", "0%", "101%", "bar%"])
 @pytest.mark.parametrize("option", SMOKE_OPTIONS)
-def test_smoke_with_invalid_n(pytester: Pytester, option: str, n: str):
+def test_smoke_invalid_n(pytester: Pytester, option: str, n: str):
     """Test the option with invalid values"""
     result = pytester.runpytest(option, n)
     assert result.ret == ExitCode.USAGE_ERROR
@@ -277,15 +337,3 @@ def test_smoke_ini_option_with_invalid_value(pytester: Pytester, option: str, in
         args.extend(["-n", "2"])
     result = pytester.runpytest(*args)
     assert result.ret == ExitCode.USAGE_ERROR
-
-
-@requires_xdist
-@pytest.mark.parametrize("option", SMOKE_OPTIONS)
-def test_smoke_with_xdist_disabled(pytester: Pytester, option: str):
-    """Test that pytest-smoke does not access the pytest-xdist plugin when it is explicitly disabled"""
-    num_tests = 10
-    pytester.makepyfile(generate_test_code(TestFuncSpec(num_params=num_tests)))
-    args = [option, "-p", "no:xdist"]
-    result = pytester.runpytest(*args)
-    assert result.ret == ExitCode.OK
-    result.assert_outcomes(passed=1, deselected=num_tests - 1)

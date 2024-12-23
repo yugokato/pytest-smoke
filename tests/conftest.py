@@ -2,6 +2,7 @@ import os
 
 import pytest
 from pytest import Pytester
+from pytest_mock import MockerFixture
 
 from pytest_smoke import smoke
 
@@ -19,6 +20,14 @@ def pytest_make_parametrize_id(val, argname):
     if isinstance(val, StrEnum):
         val = str(val)
     return f"{argname}={repr(val)}"
+
+
+@pytest.fixture(autouse=True)
+def mock_is_xdist_installed(mocker: MockerFixture):
+    """Mock the smoke.is_xdist_installed flag value to limit the effect of a change the plugin will make during some
+    tests to be within a test
+    """
+    mocker.patch.object(smoke, "_is_xdist_installed", return_value=smoke.is_xdist_installed)
 
 
 @pytest.fixture(scope="session")

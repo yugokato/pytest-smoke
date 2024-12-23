@@ -119,7 +119,7 @@ def pytest_configure(config: Config):
     if smoke.is_xdist_installed:
         if config.pluginmanager.has_plugin("xdist"):
             # Register the smoke-xdist plugin if -n/--numprocesses option is given.
-            if smoke.is_xdist_installed and config.getoption("numprocesses", default=None):
+            if config.getoption("numprocesses", default=None):
                 config.pluginmanager.register(PytestSmokeXdist(), name=PytestSmokeXdist.name)
         else:
             smoke.is_xdist_installed = False
