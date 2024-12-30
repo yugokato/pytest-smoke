@@ -8,8 +8,8 @@ versions](https://img.shields.io/pypi/pyversions/pytest-smoke.svg)](https://pypi
 [![pre-commit.ci status](https://results.pre-commit.ci/badge/github/yugokato/pytest-smoke/main.svg)](https://results.pre-commit.ci/latest/github/yugokato/pytest-smoke/main)
 [![Code style ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://docs.astral.sh/ruff/)
 
-A small `pytest` plugin that enables quick smoke testing against a large test suite by limiting the number of tests from 
-each test function (or specified scope) to a value of `N`.  
+A small `pytest` plugin that enables quick smoke testing against a large test suite by limiting the number of tests 
+executed from each test function (or specified scope) to a value of `N`.  
 You can define `N` as either a fixed number or a percentage, allowing you to scale the test execution down to a smaller 
 subset.
 
@@ -23,8 +23,8 @@ pip install pytest-smoke
 
 ## Usage
 
-The plugin provides the following options to limit the amount of tests to run (`N`, default=`1`) and optionally specify 
-the scope at which `N` is applied.    
+The plugin provides the following options to limit the amount of tests to run (`N`, default=`1`) from each scope 
+(`SCOPE`, default=`function`).  
 If provided, the value of `N` can be either a number (e.g., `5`) or a percentage (e.g., `10%`). 
 ```
 $ pytest -h
@@ -46,7 +46,7 @@ Smoke testing:
 ```
 
 > - The `--smoke-scope` option also supports any custom values, as long as they are handled in the hook
-> - You can override the plugin's default value for `N` and `SCOPE` using INI options. See the "INI Options" section below
+> - You can override the plugin's default values for `N` and `SCOPE` using INI options. See the "INI Options" section below
 > - When using the [pytest-xdist](https://pypi.org/project/pytest-xdist/) plugin for parallel testing, you can configure the `pytest-smoke` plugin to replace the default scheduler with a custom distribution algorithm that distributes tests based on the smoke scope
 
 
@@ -229,6 +229,22 @@ tests/test_something.py::test_something3[17] PASSED              [100%]
 > For any of the above examples, you can change the scope of `N` using the `--smoke-scope` option
 
 
+## Markers
+
+### `@pytest.mark.smoke(mustpass=False)`
+Collected tests explicitly marked with `@pytest.mark.smoke` are considered "critical" smoke tests while ones without 
+this marker are considered "regular" smoke tests. Additionally, if the optional `mustpass` keyword argument is set to 
+`True` in the marker, the test is considered a "must-pass" critical smoke test. 
+
+By default, this categorization has no impact on the plugin. However, when the `smoke_marked_tests_as_critical` 
+INI option is set to `true`, the plugin will apply the following behavior:
+- All collected critical tests are automatically included, in addition to the regular tests selected as part of `N`
+- Execute all critical smoke tests first, before any regular smoke tests
+- If any "must-pass" test fails, all subsequent regular smoke tests will be skipped
+
+> This feature assumes that tests will run sequentially. It will not work when running tests in parallel using a plugin like `pytest-xdist`
+
+
 ## Hooks
 
 The plugin provides the following hooks to customize or extend the plugin's capabilities: 
@@ -238,14 +254,15 @@ This hook allows you to implement your own custom scopes for the `--smoke-scope`
 predefined scopes. Items with the same group ID are grouped together and are considered to be in the same scope, 
 at which `N` is applied. Any custom values passed to the  `--smoke-scope` option must be handled in this hook.
 
-### `pytest_smoke_always_run(item, scope)`
-Return `True` for tests that will always be executed regardless of what options are specified. These items will be 
-considered additional tests and will not be counted towards the calculation of `N`.
+### `pytest_smoke_include(item, scope)`
+Return `True` for tests that should be included as "additional" tests. These tests will not be counted towards the 
+calculation of `N`.
 
 ### `pytest_smoke_exclude(item, scope)`
 Return `True` for tests that should not be selected. These items will not be included in the total number of tests to 
 which `N`% is applied. An example use case is to prevent tests that are marked with `skip` and/or `xfail` from being 
-selected.
+selected.  
+Note that this hook takes precedence over any other options provided by the plugin.
 
 
 ## INI Options
@@ -266,4 +283,8 @@ When using the [pytest-xdist](https://pypi.org/project/pytest-xdist/) plugin (>=
 option replaces the default scheduler with a custom distribution algorithm that distributes tests based on the smoke 
 scope. The custom scheduler will be automatically used when the `-n`/`--numprocesses` option is used without a dist 
 option (`--dist` or `-d`).  
+Plugin default: `false`
+
+### `smoke_marked_tests_as_critical`
+Treat tests marked with `@pytest.mark.smoke` as "critical" smoke tests.    
 Plugin default: `false`

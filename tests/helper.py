@@ -2,13 +2,18 @@ from __future__ import annotations
 
 import ast
 from collections.abc import Callable
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from itertools import chain
+
+import pytest
 
 from pytest_smoke.plugin import DEFAULT_N, SmokeScope
 from pytest_smoke.utils import scale_down
 
 TEST_NAME_BASE = "test_something"
+PARAMETRIZED_ARG_NAME_CLS = "p_c"
+PARAMETRIZED_ARG_NAME_FUNC = "p_f"
 
 
 @dataclass
@@ -45,6 +50,7 @@ class TestFuncSpec:
     num_params: int = 0
     test_class_spec: TestClassSpec = field(init=False, default=None)
     param_marker: Callable[[int], str | None] = None
+    func_body: str = None
 
 
 def generate_test_code(test_spec: TestFileSpec | TestFuncSpec) -> str:
@@ -52,8 +58,6 @@ def generate_test_code(test_spec: TestFileSpec | TestFuncSpec) -> str:
 
     :param test_spec: Test file spec or Test func spec
     """
-    param_c = "c"
-    param_f = "f"
     code = "import pytest\n"
 
     def add_parametrize_marker(
@@ -81,7 +85,9 @@ def generate_test_code(test_spec: TestFileSpec | TestFuncSpec) -> str:
         nonlocal code
         if test_class_spec.num_params:
             add_parametrize_marker(
-                param_c, num_params=test_class_spec.num_params, param_marker=test_class_spec.param_marker
+                PARAMETRIZED_ARG_NAME_CLS,
+                num_params=test_class_spec.num_params,
+                param_marker=test_class_spec.param_marker,
             )
         code += f"class {test_class_spec.name}:\n"
 
@@ -89,11 +95,11 @@ def generate_test_code(test_spec: TestFileSpec | TestFuncSpec) -> str:
         nonlocal code
         params = []
         if test_class_spec and test_class_spec.num_params:
-            params.append(param_c)
+            params.append(PARAMETRIZED_ARG_NAME_CLS)
         if test_func_spec.num_params:
-            params.append(param_f)
+            params.append(PARAMETRIZED_ARG_NAME_FUNC)
             add_parametrize_marker(
-                param_f,
+                PARAMETRIZED_ARG_NAME_FUNC,
                 num_params=test_func_spec.num_params,
                 param_marker=test_func_spec.param_marker,
                 with_indent=bool(test_class_spec),
@@ -102,7 +108,8 @@ def generate_test_code(test_spec: TestFileSpec | TestFuncSpec) -> str:
         if test_class_spec:
             sig = "self, " + sig
             code += "\t"
-        code += f"def {name}({sig}):\tpass\n\n"
+        func_body = test_func_spec.func_body or "\tpass\n"
+        code += f"def {name}({sig}):{func_body}\n"
 
     if isinstance(test_spec, TestFileSpec):
         for i, spec in enumerate(test_spec.test_specs, start=1):
@@ -214,3 +221,17 @@ def get_test_func_specs(test_file_specs: list[TestFileSpec], exclude_class: bool
     if exclude_class:
         test_specs = [x for x in test_specs if not isinstance(x, TestClassSpec)]
     return list(chain(*[(x.test_func_specs if isinstance(x, TestClassSpec) else [x]) for x in test_specs]))
+
+
+@contextmanager
+def mock_column_width(width: int):
+    """Temporarily mock the column width
+
+    :param width: Column width
+    """
+    mp = pytest.MonkeyPatch()
+    mp.setenv("COLUMNS", str(width))
+    try:
+        yield
+    finally:
+        mp.undo()

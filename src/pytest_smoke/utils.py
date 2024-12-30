@@ -1,9 +1,13 @@
+from __future__ import annotations
+
 from decimal import ROUND_HALF_UP, Decimal
 from functools import lru_cache
-from typing import Optional, Union
+from typing import TYPE_CHECKING, Optional, Union
 
 import pytest
-from pytest import Config, Item
+
+if TYPE_CHECKING:
+    from pytest import Config, Item
 
 from pytest_smoke.types import SmokeIniOption, SmokeScope
 

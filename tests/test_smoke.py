@@ -10,12 +10,14 @@ from pytest_smoke import smoke
 from pytest_smoke.types import SmokeIniOption, SmokeScope
 from pytest_smoke.utils import scale_down
 from tests.helper import (
+    PARAMETRIZED_ARG_NAME_FUNC,
     TEST_NAME_BASE,
     TestFileSpec,
     TestFuncSpec,
     generate_test_code,
     get_num_tests,
     get_num_tests_to_be_selected,
+    mock_column_width,
 )
 
 if smoke.is_xdist_installed:
@@ -122,9 +124,104 @@ def test_smoke_xdist_disabled(pytester: Pytester, option: str):
     result.assert_outcomes(passed=1, deselected=num_tests - 1)
 
 
+@pytest.mark.parametrize("num_fails", [0, 1, 2])
+@pytest.mark.parametrize("mustpass", [None, False, True])
+@pytest.mark.parametrize("option", SMOKE_OPTIONS)
+def test_smoke_marker_critical_tests(pytester: Pytester, option: str, mustpass: bool, num_fails: int):
+    """Test @pytest.mark.smoke marker with/without the optional mustpass kwarg"""
+
+    def is_critical(i):
+        return bool(i % 2)
+
+    def param_marker(i):
+        if is_critical(i):
+            if i in test2_pos_mustpass and mustpass is not None:
+                return f"smoke(mustpass={mustpass})"
+            else:
+                return "smoke"
+        else:
+            return None
+
+    smoke_n = 4
+    num_tests_1 = 10
+    num_tests_2 = 10
+    num_mustpass = 2
+    test2_pos_mustpass = list(filter(is_critical, range(num_tests_2)))[:num_mustpass]
+    func_body = f"\tassert {PARAMETRIZED_ARG_NAME_FUNC} not in {test2_pos_mustpass[:num_fails]}" if num_fails else None
+    test_file_spec = TestFileSpec(
+        [
+            TestFuncSpec(num_params=num_tests_1),
+            TestFuncSpec(
+                num_params=num_tests_2,
+                param_marker=param_marker,
+                func_body=func_body,
+            ),
+        ]
+    )
+    num_critical_tests = sum([is_critical(i) for i in range(num_tests_2)])
+    num_regular_tests = smoke_n * len(test_file_spec.test_specs)
+    num_expected_selected_tests = num_regular_tests + num_critical_tests
+    num_fails = num_fails
+    num_skips = num_regular_tests if mustpass and num_fails else 0
+    assert all(
+        [
+            smoke_n < num_tests_1,
+            smoke_n < num_tests_2,
+            smoke_n < num_critical_tests,
+            smoke_n + num_critical_tests < num_tests_2,
+            num_fails <= len(test2_pos_mustpass),
+            len(test2_pos_mustpass) < num_critical_tests,
+            all((p < num_tests_2 and is_critical(p)) for p in test2_pos_mustpass),
+        ]
+    ), "Invalid test conditions"
+
+    pytester.makepyfile(generate_test_code(test_file_spec))
+    pytester.makeini(f"""
+    [pytest]
+    {SmokeIniOption.SMOKE_MARKED_TESTS_AS_CRITICAL} = true
+    """)
+    args = [option, str(smoke_n), "-v"]
+    with mock_column_width(150):
+        result = pytester.runpytest(*args)
+    assert result.ret == (ExitCode.TESTS_FAILED if num_fails else ExitCode.OK)
+    result.assert_outcomes(
+        passed=num_expected_selected_tests - (num_fails + num_skips),
+        failed=num_fails,
+        skipped=num_skips,
+        deselected=num_tests_1 + num_tests_2 - num_expected_selected_tests,
+    )
+
+    test_name_idx_result_word_pairs = re.findall(
+        rf"test_.+\.py::({TEST_NAME_BASE}\d)\[(\d+)\] ((?:PASSED|FAILED|SKIPPED).*?)\s{{2,}}.+", str(result.stdout)
+    )
+    assert len(test_name_idx_result_word_pairs) == num_expected_selected_tests
+    for i, (test_name, param_idx, result_word) in enumerate(test_name_idx_result_word_pairs):
+        expected_test_name = (
+            f"{TEST_NAME_BASE}1" if num_critical_tests <= i < num_critical_tests + smoke_n else f"{TEST_NAME_BASE}2"
+        )
+        assert test_name == expected_test_name
+        if i < num_critical_tests:
+            # ciritical tests
+            assert is_critical(int(param_idx))
+            word = "FAILED" if num_fails and int(param_idx) in test2_pos_mustpass[:num_fails] else "PASSED"
+            if mustpass and int(param_idx) in test2_pos_mustpass:
+                assert result_word == word + " (must-pass)"
+            else:
+                assert result_word == word
+        else:
+            # regular tests
+            if mustpass and num_fails:
+                assert (
+                    result_word == f"SKIPPED ({num_fails}/{len(test2_pos_mustpass)} must-pass "
+                    f"smoke test{'s' if num_fails > 1 else ''} failed)"
+                )
+            else:
+                assert result_word == "PASSED"
+
+
 @pytest.mark.parametrize("with_hook", [True, False])
 @pytest.mark.parametrize("option", SMOKE_OPTIONS)
-def test_smoke_hook_pytest_smoke_generate_group_id(pytester: Pytester, option: str, with_hook):
+def test_smoke_hook_pytest_smoke_generate_group_id(pytester: Pytester, option: str, with_hook: bool):
     """Test pytest_smoke_generate_group_id hook and custome scopes, with/without hook definition"""
     custom_scope = "my-scope"
     num_tests = 10
@@ -156,19 +253,19 @@ def test_smoke_hook_pytest_smoke_generate_group_id(pytester: Pytester, option: s
 
 
 @pytest.mark.parametrize("option", SMOKE_OPTIONS)
-def test_smoke_hook_pytest_smoke_always_run(pytester: Pytester, option: str):
-    """Test pytest_smoke_always_run hook"""
+def test_smoke_hook_pytest_smoke_include(pytester: Pytester, option: str):
+    """Test pytest_smoke_include hook"""
     num_tests = 10
     n = 2
-    num_tests_always_run = 2
-    num_expected_selected_tests = n + num_tests_always_run
+    num_include = 2
+    num_expected_selected_tests = n + num_include
     assert num_expected_selected_tests < num_tests
-    param_marker = lambda p: "smoke" if p < num_tests_always_run else None  # noqa
+    param_marker = lambda p: "smoke" if p < num_include else None  # noqa
     pytester.makepyfile(generate_test_code(TestFuncSpec(num_params=num_tests, param_marker=param_marker)))
     pytester.makeconftest("""
     import pytest
-    def pytest_smoke_always_run(item, scope):
-        # Always run tests with the smoke mark
+    def pytest_smoke_include(item, scope):
+        # Include tests with the smoke mark as additional tests
         return item.get_closest_marker("smoke")
     """)
     args = [option, str(n)]
@@ -249,18 +346,18 @@ def test_smoke_ini_option_smoke_default_scope(pytester: Pytester, option: str):
 @pytest.mark.parametrize("dist_option", [None, "--dist=load", "-d"])
 @pytest.mark.parametrize("value", ["true", "false", None])
 def test_smoke_ini_option_smoke_default_xdist_dist_by_scope(
-    pytester: Pytester, option: str, value: str, dist_option: str
+    pytester: Pytester, option: str, value: Optional[str], dist_option: Optional[str]
 ):
     """Test smoke_default_xdist_dist_by_scope INI option.
 
     The plugin should extend the pytest-xdist to use the custom scheduler when the INI option value is true and
     when no dist option (--dist or -d) is explicitly given
     """
-    num_tests_1 = 123
-    num_tests_2 = 456
+    num_tests_1 = 100
+    num_tests_2 = 100
     test_file_spec = TestFileSpec([TestFuncSpec(num_params=num_tests_1), TestFuncSpec(num_params=num_tests_2)])
     num_test_func = len(test_file_spec.test_specs)
-    smoke_n = 100
+    smoke_n = 99
     pytester.makepyfile(test_xdist=generate_test_code(test_file_spec))
     if value:
         pytester.makeini(f"""
@@ -290,6 +387,42 @@ def test_smoke_ini_option_smoke_default_xdist_dist_by_scope(
         else:
             # Tests should be distributed from both test functions
             assert len(set(test_ids)) == num_test_func
+
+
+@pytest.mark.parametrize("option", SMOKE_OPTIONS)
+@pytest.mark.parametrize("value", [None, "true", "false"])
+def test_smoke_ini_option_smoke_marked_tests_as_critical(pytester: Pytester, option: str, value: Optional[str]):
+    """Test smoke_marked_tests_as_critical INI option"""
+    is_enabled = value == "true"
+    num_tests_1 = 5
+    num_tests_2 = 5
+    test_file_spec = TestFileSpec(
+        [
+            TestFuncSpec(num_params=num_tests_1),
+            TestFuncSpec(
+                num_params=num_tests_2,
+                # Apply @pytest.mark.smoke to all tests
+                param_marker=lambda x: "smoke",
+            ),
+        ]
+    )
+    pytester.makepyfile(generate_test_code(test_file_spec))
+    if value:
+        pytester.makeini(f"""
+        [pytest]
+        {SmokeIniOption.SMOKE_MARKED_TESTS_AS_CRITICAL} = {value}
+        """)
+    with mock_column_width(150):
+        result = pytester.runpytest(option, "-v")
+    assert result.ret == ExitCode.OK
+    test_nums = re.findall(rf"test_.+\.py::{TEST_NAME_BASE}(\d).+", str(result.stdout))
+    if is_enabled:
+        assert sorted(test_nums, reverse=True) == test_nums
+        num_passes = 1 + num_tests_2
+    else:
+        assert sorted(test_nums) == test_nums
+        num_passes = len(test_file_spec.test_specs)
+    result.assert_outcomes(passed=num_passes, deselected=num_tests_1 + num_tests_2 - num_passes)
 
 
 @pytest.mark.filterwarnings("ignore::pluggy.PluggyTeardownRaisedWarning")
