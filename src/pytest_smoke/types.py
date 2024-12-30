@@ -1,16 +1,14 @@
-import sys
-from enum import Enum, auto
+from __future__ import annotations
 
-if sys.version_info < (3, 11):
+from collections import Counter
+from dataclasses import dataclass, field
+from enum import auto
+from typing import TYPE_CHECKING
 
-    class StrEnum(str, Enum):
-        def _generate_next_value_(name, start, count, last_values) -> str:
-            return name.lower()
+if TYPE_CHECKING:
+    from pytest import Item
 
-        def __str__(self) -> str:
-            return str(self.value)
-else:
-    from enum import StrEnum
+from pytest_smoke.compat import StrEnum
 
 
 class SmokeEnvVar(StrEnum):
@@ -29,6 +27,20 @@ class SmokeIniOption(StrEnum):
     SMOKE_DEFAULT_N = auto()
     SMOKE_DEFAULT_SCOPE = auto()
     SMOKE_DEFAULT_XDIST_DIST_BY_SCOPE = auto()
+    SMOKE_MARKED_TESTS_AS_CRITICAL = auto()
 
 
 class SmokeDefaultN(int): ...
+
+
+@dataclass
+class MustpassCounter:
+    selected: set[Item] = field(default_factory=set)
+    failed: set[Item] = field(default_factory=set)
+
+
+@dataclass
+class SmokeCounter:
+    collected: Counter = field(default_factory=Counter)
+    selected: Counter = field(default_factory=Counter)
+    mustpass: MustpassCounter = field(default_factory=MustpassCounter)
