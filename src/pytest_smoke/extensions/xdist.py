@@ -1,8 +1,8 @@
 from pytest import Config, Item, Session, hookimpl
 
 from pytest_smoke import smoke
-from pytest_smoke.types import SmokeIniOption
-from pytest_smoke.utils import generate_group_id, get_scope, parse_ini_option
+from pytest_smoke.types import SmokeIniOption, SmokeOption
+from pytest_smoke.utils import generate_group_id, parse_ini_option
 
 if smoke.is_xdist_installed:
     from xdist import is_xdist_controller
@@ -43,9 +43,10 @@ if smoke.is_xdist_installed:
 
         def __init__(self, config: Config, log, *, nodes: dict[str, Item]):
             super().__init__(config, log)
-            self._scope = get_scope(self.config)
+            self.smoke_option = SmokeOption(config)
             self._nodes = nodes
 
         def _split_scope(self, nodeid: str) -> str:
             item = self._nodes[nodeid]
-            return generate_group_id(item, self._scope) or super()._split_scope(nodeid)
+
+            return generate_group_id(item, self.smoke_option.scope) or super()._split_scope(nodeid)

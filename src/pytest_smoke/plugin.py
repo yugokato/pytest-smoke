@@ -1,21 +1,36 @@
 from __future__ import annotations
 
 import os
-import random
 from collections import Counter
 from typing import TYPE_CHECKING, Optional, Union
-from uuid import UUID, uuid4
+from uuid import uuid4
 
 import pytest
 from pytest import StashKey
 
 from pytest_smoke import smoke
 from pytest_smoke.compat import TestShortLogReport
-from pytest_smoke.types import SmokeCounter, SmokeDefaultN, SmokeEnvVar, SmokeIniOption, SmokeScope
-from pytest_smoke.utils import generate_group_id, get_scope, parse_ini_option, parse_n, parse_scope, scale_down
+from pytest_smoke.types import (
+    SmokeCounter,
+    SmokeDefaultN,
+    SmokeEnvVar,
+    SmokeIniOption,
+    SmokeOption,
+    SmokeScope,
+    SmokeSelectMode,
+)
+from pytest_smoke.utils import (
+    generate_group_id,
+    parse_ini_option,
+    parse_n,
+    parse_scope,
+    parse_select_mode,
+    scale_down,
+    sort_items,
+)
 
 if smoke.is_xdist_installed:
-    from xdist import is_xdist_controller, is_xdist_worker
+    from xdist import is_xdist_worker
 
     from pytest_smoke.extensions.xdist import PytestSmokeXdist
 
@@ -47,27 +62,9 @@ def pytest_addoption(parser: Parser):
         type=parse_n,
         nargs="?",
         default=False,
-        help="Run the first N (default=1) tests from each test function or specified scope",
-    )
-    group.addoption(
-        "--smoke-last",
-        dest="smoke_last",
-        metavar="N",
-        const=DEFAULT_N,
-        type=parse_n,
-        nargs="?",
-        default=False,
-        help="Run the last N (default=1) tests from each test function or specified scope",
-    )
-    group.addoption(
-        "--smoke-random",
-        dest="smoke_random",
-        metavar="N",
-        const=DEFAULT_N,
-        type=parse_n,
-        nargs="?",
-        default=False,
-        help="Run N (default=1) randomly selected tests from each test function or specified scope",
+        help="Run only N tests from each test function or specified scope.\n"
+        "If N is explicitly provided to the option, it can be a number (e.g. 5) or a percentage (e.g. 10%%).\n"
+        "Otherwise, the default value of 1 will be applied.",
     )
     group.addoption(
         "--smoke-scope",
@@ -76,14 +73,26 @@ def pytest_addoption(parser: Parser):
         type=parse_scope,
         help=(
             "Specify the scope at which the value of N from the above options is applied.\n"
-            "The plugin provides the following predefined scopes:\n"
+            "The plugin provides the following predefined scopes, as well as custom user-defined scopes via a hook:\n"
             f"- {SmokeScope.FUNCTION}: Applies to each test function (default)\n"
             f"- {SmokeScope.CLASS}: Applies to each test class\n"
             f"- {SmokeScope.AUTO}: Applies {SmokeScope.FUNCTION} scope for test functions, "
             f"{SmokeScope.CLASS} scope for test methods\n"
             f"- {SmokeScope.FILE}: Applies to each test file\n"
-            f"- {SmokeScope.ALL}: Applies to the entire test suite\n"
-            "NOTE: You can also implement your own custom scopes using a hook"
+            f"- {SmokeScope.ALL}: Applies to the entire test suite"
+        ),
+    )
+    group.addoption(
+        "--smoke-select-mode",
+        dest="smoke_select_mode",
+        metavar="MODE",
+        type=parse_select_mode,
+        help=(
+            "Specify the mode for selecting tests from each scope.\n"
+            "The plugin provides the following predefined values, as well as custom user-defined values via a hook:\n"
+            f"- {SmokeSelectMode.FIRST}: The first N tests (default)\n"
+            f"- {SmokeSelectMode.LAST}: The last N tests\n"
+            f"- {SmokeSelectMode.RANDOM}: N randomly selected tests"
         ),
     )
 
@@ -98,6 +107,12 @@ def pytest_addoption(parser: Parser):
         type="string",
         default=SmokeScope.FUNCTION,
         help="[pytest-smoke] Override the plugin default value for smoke scope",
+    )
+    parser.addini(
+        SmokeIniOption.SMOKE_DEFAULT_SELECT_MODE,
+        type="string",
+        default=SmokeSelectMode.FIRST,
+        help="[pytest-smoke] Override the plugin default value for smoke select mode",
     )
     parser.addini(
         SmokeIniOption.SMOKE_DEFAULT_XDIST_DIST_BY_SCOPE,
@@ -116,15 +131,8 @@ def pytest_addoption(parser: Parser):
 
 @pytest.hookimpl(tryfirst=True)
 def pytest_configure(config: Config):
-    if sum([bool(config.option.smoke), bool(config.option.smoke_last), bool(config.option.smoke_random)]) > 1:
-        raise pytest.UsageError("--smoke, --smoke-last, and --smoke-random options are mutually exclusive")
-
-    if config.option.smoke_scope and not any(
-        [config.option.smoke, config.option.smoke_last, config.option.smoke_random]
-    ):
-        raise pytest.UsageError(
-            "The --smoke-scope option requires one of --smoke, --smoke-last, or --smoke-random to be specified"
-        )
+    if not config.option.smoke and (config.option.smoke_scope or config.option.smoke_select_mode):
+        raise pytest.UsageError("The --smoke option is requierd to use the pytest-smoke functionality")
 
     config.addinivalue_line(
         "markers",
@@ -159,37 +167,19 @@ def pytest_collection_modifyitems(session: Session, config: Config, items: list[
         if not items:
             return
 
-        if n := (config.option.smoke or config.option.smoke_last or config.option.smoke_random):
-            if isinstance(n, SmokeDefaultN):
-                # N was not explicitly provided to the option. Apply the INI config value or the plugin default
-                n = parse_ini_option(config, SmokeIniOption.SMOKE_DEFAULT_N)
-
-            if is_scale := isinstance(n, str) and n.endswith("%"):
-                num_smoke = float(n[:-1])
-            else:
-                num_smoke = n
-
-            scope = get_scope(config)
+        opt = SmokeOption(config)
+        if opt.n:
             selected_items_regular = []
             selected_items_critical = []
             deselected_items = []
             smoke_groups_reached_threshold = set()
-            counter = SmokeCounter(collected=Counter(filter(None, (generate_group_id(item, scope) for item in items))))
+            counter = SmokeCounter(
+                collected=Counter(filter(None, (generate_group_id(item, opt.scope) for item in items)))
+            )
             session.stash[STASH_KEY_SMOKE_COUNTER] = counter
-            if config.option.smoke_random:
-                if smoke.is_xdist_installed and (is_xdist_controller(session) or is_xdist_worker(session)):
-                    # Set the seed to ensure XDIST controler and workers collect the same items
-                    random_ = random.Random(UUID(os.environ[SmokeEnvVar.SMOKE_TEST_SESSION_UUID]).time)
-                else:
-                    random_ = random
-                items_to_filter = random_.sample(items, len(items))
-            elif config.option.smoke_last:
-                items_to_filter = items[::-1]
-            else:
-                items_to_filter = items
 
-            for item in items_to_filter:
-                group_id = generate_group_id(item, scope)
+            for item in sort_items(items, session, opt):
+                group_id = generate_group_id(item, opt.scope)
                 if group_id is None:
                     deselected_items.append(item)
                     continue
@@ -203,7 +193,7 @@ def pytest_collection_modifyitems(session: Session, config: Config, items: list[
                     item.stash[STASH_KEY_SMOKE_IS_CIRITICAL] = True
                     item.stash[STASH_KEY_SMOKE_IS_MUSTPASS] = is_mustpass
                     continue
-                elif config.hook.pytest_smoke_include(item=item, scope=scope):
+                elif config.hook.pytest_smoke_include(item=item, scope=opt.scope):
                     selected_items_regular.append(item)
                     continue
 
@@ -211,7 +201,7 @@ def pytest_collection_modifyitems(session: Session, config: Config, items: list[
                     deselected_items.append(item)
                     continue
 
-                threshold = scale_down(counter.collected[group_id], num_smoke) if is_scale else num_smoke
+                threshold = scale_down(counter.collected[group_id], float(opt.n[:-1])) if opt.is_scale else opt.n
                 if counter.selected[group_id] < threshold:
                     counter.selected.update([group_id])
                     selected_items_regular.append(item)
@@ -224,7 +214,7 @@ def pytest_collection_modifyitems(session: Session, config: Config, items: list[
                 if deselected_items:
                     config.hook.pytest_deselected(items=deselected_items)
 
-                if config.option.smoke_random or config.option.smoke_last:
+                if opt.select_mode != SmokeSelectMode.FIRST:
                     # retain the original test order
                     for smoke_items in (selected_items_critical, selected_items_regular):
                         if smoke_items:

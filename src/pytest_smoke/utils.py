@@ -1,15 +1,22 @@
 from __future__ import annotations
 
+import os
+import random
 from decimal import ROUND_HALF_UP, Decimal
 from functools import lru_cache
 from typing import TYPE_CHECKING, Optional, Union
+from uuid import UUID
 
 import pytest
 
-if TYPE_CHECKING:
-    from pytest import Config, Item
+from pytest_smoke import smoke
+from pytest_smoke.types import SmokeEnvVar, SmokeIniOption, SmokeOption, SmokeScope, SmokeSelectMode
 
-from pytest_smoke.types import SmokeIniOption, SmokeScope
+if smoke.is_xdist_installed:
+    from xdist import is_xdist_controller, is_xdist_worker
+
+if TYPE_CHECKING:
+    from pytest import Config, Item, Session
 
 
 @lru_cache
@@ -29,6 +36,11 @@ def scale_down(value: float, percentage: float, precision: int = 0, min_value: i
 
 @lru_cache
 def generate_group_id(item: Item, scope: str) -> Optional[str]:
+    """Generate a smoke scope group ID for the item
+
+    :param item: Collected Pytest item
+    :param scope: Smoke scope
+    """
     assert scope
     if item.config.hook.pytest_smoke_exclude(item=item, scope=scope):
         return
@@ -64,6 +76,36 @@ def generate_group_id(item: Item, scope: str) -> Optional[str]:
     return group_id
 
 
+def sort_items(items: list[Item], session: Session, smoke_option: SmokeOption) -> list[Item]:
+    """Sort collected Pytest items for the given select mode
+
+    :param items: Collected Pytest items
+    :param session: Pytest session
+    :param smoke_option: Smoke option
+    """
+    if smoke_option.select_mode == SmokeSelectMode.FIRST:
+        sorted_items = items
+    elif smoke_option.select_mode == SmokeSelectMode.LAST:
+        sorted_items = items[::-1]
+    elif smoke_option.select_mode == SmokeSelectMode.RANDOM:
+        if smoke.is_xdist_installed and (is_xdist_controller(session) or is_xdist_worker(session)):
+            # Set the seed to ensure XDIST controler and workers collect the same items
+            random_ = random.Random(UUID(os.environ[SmokeEnvVar.SMOKE_TEST_SESSION_UUID]).time)
+        else:
+            random_ = random
+        sorted_items = random_.sample(items, len(items))
+    else:
+        sorted_items = session.config.hook.pytest_smoke_sort_by_select_mode(
+            items=items.copy(), scope=smoke_option.scope, select_mode=smoke_option.select_mode
+        )
+        if sorted_items is None:
+            raise pytest.UsageError(
+                f"The custom sort logic for the select mode '{smoke_option.select_mode}' must be implemented using the "
+                f"pytest_smoke_sort_by_select_mode hook"
+            )
+    return sorted_items
+
+
 def parse_n(value: str) -> Union[int, str]:
     v = value.strip()
     try:
@@ -85,6 +127,12 @@ def parse_n(value: str) -> Union[int, str]:
         )
 
 
+def parse_select_mode(value: str) -> str:
+    if (v := value.strip()) == "":
+        raise pytest.UsageError(f"Invalid select mode: '{value}'")
+    return v
+
+
 def parse_scope(value: str) -> str:
     if (v := value.strip()) == "":
         raise pytest.UsageError(f"Invalid scope: '{value}'")
@@ -96,19 +144,14 @@ def parse_ini_option(config: Config, option: SmokeIniOption) -> Union[str, int, 
         v = config.getini(option)
         if option == SmokeIniOption.SMOKE_DEFAULT_N:
             return parse_n(v)
+        elif option == SmokeIniOption.SMOKE_DEFAULT_SELECT_MODE:
+            return parse_select_mode(v)
         elif option == SmokeIniOption.SMOKE_DEFAULT_SCOPE:
             return parse_scope(v)
         else:
             return v
     except ValueError as e:
         raise pytest.UsageError(f"{option}: {e}")
-
-
-@lru_cache
-def get_scope(config: Config) -> str:
-    scope = config.option.smoke_scope or parse_ini_option(config, SmokeIniOption.SMOKE_DEFAULT_SCOPE)
-    assert scope
-    return scope
 
 
 def _round_half_up(x: float, precision: int) -> float:
