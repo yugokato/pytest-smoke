@@ -10,8 +10,9 @@ if os.environ.get("IGNORE_XDIST") == "true":
     smoke.is_xdist_installed = False
 
 from pytest_smoke.compat import StrEnum
-from tests.helper import TestClassSpec, TestFileSpec, TestFuncSpec, generate_test_code
+from tests.helper import TestClassSpec, TestFileSpec, TestFuncSpec, generate_test_code, patch_runpytest
 
+Pytester.runpytest = patch_runpytest(Pytester.runpytest)
 pytest_plugins = "pytester"
 
 

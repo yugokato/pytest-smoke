@@ -2,18 +2,22 @@ from __future__ import annotations
 
 import ast
 from collections.abc import Callable
-from contextlib import contextmanager
+from contextlib import contextmanager, nullcontext
 from dataclasses import dataclass, field
+from functools import wraps
 from itertools import chain
 
 import pytest
 
+from pytest_smoke import smoke
 from pytest_smoke.plugin import DEFAULT_N, SmokeScope
 from pytest_smoke.utils import scale_down
 
 TEST_NAME_BASE = "test_something"
 PARAMETRIZED_ARG_NAME_CLS = "p_c"
 PARAMETRIZED_ARG_NAME_FUNC = "p_f"
+
+requires_xdist = pytest.mark.skipif(not smoke.is_xdist_installed, reason="pytest-xdist is required")
 
 
 @dataclass
@@ -235,3 +239,17 @@ def mock_column_width(width: int):
         yield
     finally:
         mp.undo()
+
+
+def patch_runpytest(f):
+    """A decorator for patching pytester.runpytest() to temporarily mock the column width during a test when the -v
+    option is given to ensure the stdout is captured in a standard terminal size.
+    This prevents the flaky test results caused by a teser's actual terminal size
+    """
+
+    @wraps(f)
+    def wrapper(*args, **kwargs):
+        with mock_column_width(150) if "-v" in args else nullcontext():
+            return f(*args, **kwargs)
+
+    return wrapper
