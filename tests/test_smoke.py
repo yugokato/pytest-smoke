@@ -39,6 +39,13 @@ def test_smoke_command_help(pytester: Pytester):
     assert re.search(pattern2, stdout, re.DOTALL)
 
 
+def test_smoke_show_markers(pytester: Pytester):
+    """Test the custom marker information provided by the plugin"""
+    result = pytester.runpytest("--markers")
+    assert result.ret == ExitCode.OK
+    result.stdout.re_match_lines([r"@pytest\.mark\.smoke\(\*, mustpass=False, runif=True\): .+"])
+
+
 @pytest.mark.usefixtures("generate_test_files")
 def test_smoke_no_option(pytester: Pytester, test_file_specs: list[TestFileSpec]):
     """Test the plugin does not affect pytest when no plugin options are given"""
@@ -102,42 +109,49 @@ def test_smoke_select_mode(pytester: Pytester, select_mode: Optional[str]):
 
 
 @pytest.mark.parametrize("num_fails", [0, 1, 2])
+@pytest.mark.parametrize("runif", [None, False, True])
 @pytest.mark.parametrize("mustpass", [None, False, True])
-def test_smoke_marker_critical_tests(pytester: Pytester, mustpass: bool, num_fails: int):
-    """Test @pytest.mark.smoke marker with/without the optional mustpass kwarg"""
+def test_smoke_marker_critical_tests(pytester: Pytester, mustpass: bool, runif: Optional[bool], num_fails: int):
+    """Test @pytest.mark.smoke marker with/without the optional mustpass and runif kwargs"""
 
     def is_critical(i):
         return bool(i % 2)
 
     def param_marker(i):
+        mark = "smoke"
         if is_critical(i):
+            kwargs = {}
             if i in test2_pos_mustpass and mustpass is not None:
-                return f"smoke(mustpass={mustpass})"
-            else:
-                return "smoke"
+                kwargs["mustpass"] = mustpass
+            if i in test2_pos_with_runif and runif is not None:
+                kwargs["runif"] = runif
+            if kwargs:
+                args = ", ".join(f"{k}={v}" for k, v in kwargs.items())
+                mark = f"{mark}({args})"
+            return mark
         else:
             return None
 
     smoke_n = 4
     num_tests_1 = 10
-    num_tests_2 = 10
+    num_tests_2 = 20
     num_mustpass = 2
-    test2_pos_mustpass = list(filter(is_critical, range(num_tests_2)))[:num_mustpass]
+    num_critical_with_runif = 3
+    test2_pos_critical = list(filter(is_critical, range(num_tests_2)))
+    test2_pos_mustpass = test2_pos_critical[:num_mustpass]
+    test2_pos_with_runif = test2_pos_critical[-num_critical_with_runif:]
     func_body = f"\tassert {PARAMETRIZED_ARG_NAME_FUNC} not in {test2_pos_mustpass[:num_fails]}" if num_fails else None
     test_file_spec = TestFileSpec(
         [
             TestFuncSpec(num_params=num_tests_1),
-            TestFuncSpec(
-                num_params=num_tests_2,
-                param_marker=param_marker,
-                func_body=func_body,
-            ),
+            TestFuncSpec(num_params=num_tests_2, param_marker=param_marker, func_body=func_body),
         ]
     )
     num_critical_tests = sum([is_critical(i) for i in range(num_tests_2)])
+    if runif is False:
+        num_critical_tests -= len(test2_pos_with_runif)
     num_regular_tests = smoke_n * len(test_file_spec.test_specs)
     num_expected_selected_tests = num_regular_tests + num_critical_tests
-    num_fails = num_fails
     num_skips = num_regular_tests if mustpass and num_fails else 0
     assert all(
         [
@@ -145,8 +159,9 @@ def test_smoke_marker_critical_tests(pytester: Pytester, mustpass: bool, num_fai
             smoke_n < num_tests_2,
             smoke_n < num_critical_tests,
             smoke_n + num_critical_tests < num_tests_2,
-            num_fails <= len(test2_pos_mustpass),
-            len(test2_pos_mustpass) < num_critical_tests,
+            num_fails <= num_mustpass,
+            num_mustpass < num_critical_tests,
+            num_critical_with_runif < num_critical_tests,
             all((p < num_tests_2 and is_critical(p)) for p in test2_pos_mustpass),
         ]
     ), "Invalid test conditions"

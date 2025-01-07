@@ -15,6 +15,7 @@ from pytest_smoke.types import (
     SmokeDefaultN,
     SmokeEnvVar,
     SmokeIniOption,
+    SmokeMarker,
     SmokeOption,
     SmokeScope,
     SmokeSelectMode,
@@ -136,11 +137,13 @@ def pytest_configure(config: Config):
 
     config.addinivalue_line(
         "markers",
-        "smoke(mustpass=False): [pytest-smoke] When running smoke tests using the pytest-smoke plugin, the marked test "
-        "is considered a 'critical' smoke test. Additionally if the optional mustpass keyword argument is set to True, "
-        "the test is considered a 'must-pass' critical smoke test. When the feature is explicitly enabled via an INI "
-        "option, critical smoke tests are executed first before regular smoke tests. If any 'must-pass' test fails, "
-        "all subsequent regular smoke tests will be skipped",
+        "smoke(*, mustpass=False, runif=True): [pytest-smoke] When running smoke tests using the pytest-smoke plugin, "
+        "and the feature is explicitly enabled via an INI option, the marked test is considered a 'critical' smoke "
+        "test. Additionally, if the optional mustpass keyword argument is set to True, the test is considered a "
+        "'must-pass' critical smoke test. Critical smoke tests with runif=True are automatically included and executed "
+        "first, before regular smoke tests. If any 'must-pass' test fails, all subsequent regular smoke tests will be "
+        "skipped.\n"
+        "Note: The marker will have no effect on the plugin until the feature has been enabled",
     )
 
     if smoke.is_xdist_installed:
@@ -177,6 +180,7 @@ def pytest_collection_modifyitems(session: Session, config: Config, items: list[
                 collected=Counter(filter(None, (generate_group_id(item, opt.scope) for item in items)))
             )
             session.stash[STASH_KEY_SMOKE_COUNTER] = counter
+            enable_critical_tests = parse_ini_option(config, SmokeIniOption.SMOKE_MARKED_TESTS_AS_CRITICAL)
 
             for item in sort_items(items, session, opt):
                 group_id = generate_group_id(item, opt.scope)
@@ -185,13 +189,15 @@ def pytest_collection_modifyitems(session: Session, config: Config, items: list[
                     continue
 
                 # Tests that match the below conditions will not be counted towards the calculation of N
-                smoke_marker = item.get_closest_marker("smoke")
-                if smoke_marker and parse_ini_option(config, SmokeIniOption.SMOKE_MARKED_TESTS_AS_CRITICAL):
-                    selected_items_critical.append(item)
-                    if is_mustpass := smoke_marker.kwargs.get("mustpass", False) is True:
-                        counter.mustpass.selected.add(item)
-                    item.stash[STASH_KEY_SMOKE_IS_CIRITICAL] = True
-                    item.stash[STASH_KEY_SMOKE_IS_MUSTPASS] = is_mustpass
+                if enable_critical_tests and (smoke_marker := SmokeMarker.from_item(item)):
+                    if smoke_marker.runif:
+                        selected_items_critical.append(item)
+                        if smoke_marker.mustpass:
+                            counter.mustpass.selected.add(item)
+                        item.stash[STASH_KEY_SMOKE_IS_CIRITICAL] = True
+                        item.stash[STASH_KEY_SMOKE_IS_MUSTPASS] = smoke_marker.mustpass
+                    else:
+                        deselected_items.append(item)
                     continue
                 elif config.hook.pytest_smoke_include(item=item, scope=opt.scope):
                     selected_items_regular.append(item)
