@@ -75,6 +75,17 @@ class SmokeOption:
         return parse_ini_option(self.config, option)
 
 
+class SmokeMarker:
+    def __init__(self, *args, mustpass: bool = False, runif: bool = True, **kwargs):
+        self.mustpass = bool(mustpass)
+        self.runif = bool(runif)
+
+    @classmethod
+    def from_item(cls, item: Item) -> Optional[SmokeMarker]:
+        if marker := item.get_closest_marker("smoke"):
+            return cls(*marker.args, **marker.kwargs)
+
+
 @dataclass
 class MustpassCounter:
     selected: set[Item] = field(default_factory=set)

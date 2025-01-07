@@ -129,18 +129,19 @@ tests/test_something.py::test_something3[3] PASSED               [100%]
 
 ## Markers
 
-### `@pytest.mark.smoke(mustpass=False)`
-Collected tests explicitly marked with `@pytest.mark.smoke` are considered "critical" smoke tests while ones without 
-this marker are considered "regular" smoke tests. Additionally, if the optional `mustpass` keyword argument is set to 
-`True` in the marker, the test is considered a "must-pass" critical smoke test. 
+### `@pytest.mark.smoke(*, mustpass=False, runif=True)`
+When the feature is explicitly enabled via the `smoke_marked_tests_as_critical` INI option, collected tests marked with 
+`@pytest.mark.smoke` are considered "critical" smoke tests while ones without this marker are considered "regular" 
+smoke tests. Additionally, if the optional `mustpass` keyword argument is set to `True` in the marker, the test is 
+considered a "must-pass" critical smoke test.   
 
-By default, this categorization has no impact on the plugin. However, when the `smoke_marked_tests_as_critical` 
-INI option is set to `true`, the plugin will apply the following behavior:
-- All collected critical tests are automatically included, in addition to the regular tests selected as part of `N`
-- Execute all critical smoke tests first, before any regular smoke tests
+The plugin will apply the following behavior:
+- All collected critical tests with `runif=True` are automatically included, in addition to the regular tests selected as part of `N` (Ones with `runif=False` will be deselected)
+- Execute critical smoke tests first, before any regular smoke tests
 - If any "must-pass" test fails, all subsequent regular smoke tests will be skipped
 
-> This feature assumes that tests will run sequentially. It will not work when running tests in parallel using a plugin like `pytest-xdist`
+> - The marker will have no effect on the plugin until the feature has been enabled
+> - When enabled, the plugin assumes that tests will run sequentially. It will not work when running tests in parallel using a plugin like `pytest-xdist`
 
 
 ## Hooks
