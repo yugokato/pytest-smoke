@@ -48,6 +48,7 @@ Smoke testing:
                         - random: N randomly selected tests
 ```
 
+> [!NOTE]
 > - The `--smoke` option is required to use any `pytest-smoke` plugin functionality
 > - The `--smoke-scope` and `--smoke-select-mode` options also support any custom values, as long as they are handled in the hook. See the "Hooks" section below
 > - You can override the plugin's default values for `N`, `SCOPE`, and `MODE` using INI options. See the "INI Options" section below
@@ -140,6 +141,7 @@ The plugin will apply the following behavior:
 - Execute critical smoke tests first, before any regular smoke tests
 - If any "must-pass" test fails, all subsequent regular smoke tests will be skipped
 
+> [!NOTE]
 > - The marker will have no effect on the plugin until the feature has been enabled
 > - When enabled, the plugin assumes that tests will run sequentially. It will not work when running tests in parallel using a plugin like `pytest-xdist`
 
