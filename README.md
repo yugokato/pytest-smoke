@@ -4,8 +4,7 @@ pytest-smoke
 [![PyPI](https://img.shields.io/pypi/v/pytest-smoke)](https://pypi.org/project/pytest-smoke/)
 [![Supported Python
 versions](https://img.shields.io/pypi/pyversions/pytest-smoke.svg)](https://pypi.org/project/pytest-smoke/)
-[![test](https://github.com/yugokato/pytest-smoke/actions/workflows/test.yml/badge.svg)](https://github.com/yugokato/pytest-smoke/actions/workflows/test.yml)
-[![pre-commit.ci status](https://results.pre-commit.ci/badge/github/yugokato/pytest-smoke/main.svg)](https://results.pre-commit.ci/latest/github/yugokato/pytest-smoke/main)
+[![test](https://github.com/yugokato/pytest-smoke/actions/workflows/test.yml/badge.svg?branch=main)](https://github.com/yugokato/pytest-smoke/actions/workflows/test.yml?query=branch%3Amain)
 [![Code style ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://docs.astral.sh/ruff/)
 
 A `pytest` plugin that provides a quick way to perform smoke testing against a large test suite by limiting the 

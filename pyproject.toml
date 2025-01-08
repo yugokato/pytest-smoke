@@ -34,16 +34,18 @@ dynamic = ["version"]
 
 
 [project.optional-dependencies]
-dev = [
+lint = [
     "pre-commit>=3.0.0,<5",
     "ruff==0.8.6",
-    "tox>=4.0.0,<5",
-    "tox-uv>=1.0.0,<2",
-    "pytest-smoke[test]"
 ]
 test = [
     "pytest-mock>=3.0.0,<4",
     "pytest-xdist[psutil]>=2.3.0,<4"
+]
+dev = [
+    "tox>=4.0.0,<5",
+    "tox-uv>=1.0.0,<2",
+    "pytest-smoke[lint,test]",
 ]
 
 [project.urls]
