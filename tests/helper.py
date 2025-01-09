@@ -6,6 +6,7 @@ from contextlib import contextmanager, nullcontext
 from dataclasses import dataclass, field
 from functools import wraps
 from itertools import chain
+from typing import Optional
 
 import pytest
 
@@ -27,6 +28,7 @@ class TestFileSpec:
     __test__ = False
 
     test_specs: list[TestFuncSpec | TestClassSpec] = field(default_factory=list)
+    test_dir: Optional[str] = None
 
 
 @dataclass
@@ -158,50 +160,42 @@ def get_num_tests_to_be_selected(test_file_specs: list[TestFileSpec], n: str | N
     :param n: N value given for the smoke option
     :param scope: Smoke scope value
     """
-    n = n or str(DEFAULT_N)
-    is_scale = n.endswith("%")
-    test_class_specs = get_test_class_specs(test_file_specs)
-    if is_scale:
-        scale = float(n[:-1])
-        if scope == SmokeScope.ALL:
-            num_expected_tests = scale_down(get_num_tests(*test_file_specs), scale)
-        elif scope == SmokeScope.FILE:
-            num_expected_tests = sum([int(scale_down(get_num_tests(*x.test_specs), scale)) for x in test_file_specs])
-        elif scope == SmokeScope.AUTO:
-            num_expected_tests = sum(
-                [
-                    *(int(scale_down(get_num_tests(x), scale)) for x in test_class_specs),
-                    *(
-                        int(scale_down(get_num_tests(x), scale))
-                        for x in get_test_func_specs(test_file_specs, exclude_class=True)
-                    ),
-                ]
-            )
-        elif scope == SmokeScope.CLASS:
-            num_expected_tests = sum([int(scale_down(get_num_tests(x), scale)) for x in test_class_specs])
+
+    def get_num_expected_tests_per_scope(*test_specs):
+        n_ = n or str(DEFAULT_N)
+        if n_.endswith("%"):
+            scale = float(n_[:-1])
+            return int(scale_down(get_num_tests(*test_specs), scale))
         else:
-            num_expected_tests = sum(
-                [int(scale_down(get_num_tests(x), scale)) for x in get_test_func_specs(test_file_specs)]
-            )
+            return min([int(n_), get_num_tests(*test_specs)])
+
+    test_class_specs = get_test_class_specs(test_file_specs) if scope in [SmokeScope.AUTO, SmokeScope.CLASS] else None
+    if scope == SmokeScope.ALL:
+        num_expected_tests = get_num_expected_tests_per_scope(*test_file_specs)
+    elif scope == SmokeScope.DIRECTORY:
+        test_specs_per_dir = {}
+        for test_file_spec in test_file_specs:
+            test_specs_per_dir.setdefault(test_file_spec.test_dir, []).extend(test_file_spec.test_specs)
+        num_expected_tests = sum(
+            get_num_expected_tests_per_scope(*test_specs) for test_specs in test_specs_per_dir.values()
+        )
+    elif scope == SmokeScope.FILE:
+        num_expected_tests = sum(get_num_expected_tests_per_scope(*x.test_specs) for x in test_file_specs)
+    elif scope == SmokeScope.AUTO:
+        num_expected_tests = sum(
+            [
+                *(get_num_expected_tests_per_scope(x) for x in test_class_specs),
+                *(
+                    get_num_expected_tests_per_scope(x)
+                    for x in get_test_func_specs(test_file_specs, exclude_class=True)
+                ),
+            ]
+        )
+    elif scope == SmokeScope.CLASS:
+        num_expected_tests = sum(get_num_expected_tests_per_scope(x) for x in test_class_specs)
     else:
-        if scope == SmokeScope.ALL:
-            num_expected_tests = min([int(n), get_num_tests(*test_file_specs)])
-        elif scope == SmokeScope.FILE:
-            num_expected_tests = sum([min([int(n), get_num_tests(*x.test_specs)]) for x in test_file_specs])
-        elif scope == SmokeScope.AUTO:
-            num_expected_tests = sum(
-                [
-                    *(min([int(n), get_num_tests(x)]) for x in test_class_specs),
-                    *(
-                        min([int(n), get_num_tests(x)])
-                        for x in get_test_func_specs(test_file_specs, exclude_class=True)
-                    ),
-                ]
-            )
-        elif scope == SmokeScope.CLASS:
-            num_expected_tests = sum([min([int(n), get_num_tests(x)]) for x in test_class_specs])
-        else:
-            num_expected_tests = sum([min([int(n), get_num_tests(x)]) for x in get_test_func_specs(test_file_specs)])
+        # default = function
+        num_expected_tests = sum(get_num_expected_tests_per_scope(x) for x in get_test_func_specs(test_file_specs))
 
     return num_expected_tests
 

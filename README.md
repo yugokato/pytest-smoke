@@ -7,18 +7,24 @@ versions](https://img.shields.io/pypi/pyversions/pytest-smoke.svg)](https://pypi
 [![test](https://github.com/yugokato/pytest-smoke/actions/workflows/test.yml/badge.svg?branch=main)](https://github.com/yugokato/pytest-smoke/actions/workflows/test.yml?query=branch%3Amain)
 [![Code style ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://docs.astral.sh/ruff/)
 
-A `pytest` plugin that provides a quick way to perform smoke testing against a large test suite by limiting the 
-number of tests executed from each test function (or specified scope) to a value of `N`.  
-You can specify `N` as either a fixed number or a percentage, allowing you to scale the test execution down to a smaller 
-subset.
+`pytest-smoke` is a `pytest` plugin designed to quickly perform smoke testing on large test suites. It helps you scale 
+down test execution by running a smaller subset of tests from each function (or specified scope).
 
 
 ## Installation
 
-```
+```bash
 pip install pytest-smoke
 ```
 
+
+## Quick Start
+
+For a quick smoke test with all default options, simply run:
+```bash
+pytest --smoke
+```
+This will run a small subset of tests from your test suite to quickly check basic functionality.
 
 ## Usage
 
@@ -30,14 +36,15 @@ $ pytest -h
 
 Smoke testing:
   --smoke=[N]           Run only N tests from each test function or specified scope.
-                        If N is explicitly provided to the option, it can be a number (e.g. 5) or a percentage (e.g. 10%).
-                        Otherwise, the default value of 1 will be applied.
+                        N can be a number (e.g. 5) or a percentage (e.g. 10%).
+                        If not provided, the default value is 1.
   --smoke-scope=SCOPE   Specify the scope at which the value of N from the above options is applied.
                         The plugin provides the following predefined scopes, as well as custom user-defined scopes via a hook:
                         - function: Applies to each test function (default)
                         - class: Applies to each test class
                         - auto: Applies function scope for test functions, class scope for test methods
                         - file: Applies to each test file
+                        - directory: Applies to each test directory
                         - all: Applies to the entire test suite
   --smoke-select-mode=MODE
                         Specify the mode for selecting tests from each scope.
@@ -48,7 +55,7 @@ Smoke testing:
 ```
 
 > [!NOTE]
-> - The `--smoke` option is required to use any `pytest-smoke` plugin functionality
+> - The `--smoke` option is always required to use any `pytest-smoke` plugin functionality
 > - The `--smoke-scope` and `--smoke-select-mode` options also support any custom values, as long as they are handled in the hook. See the "Hooks" section below
 > - You can override the plugin's default values for `N`, `SCOPE`, and `MODE` using INI options. See the "INI Options" section below
 > - When using the [pytest-xdist](https://pypi.org/project/pytest-xdist/) plugin for parallel testing, you can configure the `pytest-smoke` plugin to replace the default scheduler with a custom distribution algorithm that distributes tests based on the smoke scope
@@ -74,7 +81,8 @@ def test_something3(p):
     pass
 ```
 
-You can run smoke tests with the `--smoke` option. Here are some basic examples:
+You can run smoke tests on subsets of different sizes with the `--smoke` option.  
+Here are some basic examples:
 
 - Run only the first test from each test function
 ```

@@ -21,6 +21,7 @@ class SmokeScope(StrEnum):
     CLASS = auto()
     AUTO = auto()
     FILE = auto()
+    DIRECTORY = auto()
     ALL = auto()
 
 
