@@ -9,9 +9,9 @@ except PackageNotFoundError:
 class PytestSmoke:
     def __init__(self):
         try:
-            from xdist import __version__ as __xdist_version__
+            from xdist import __version__ as xdist_ver
 
-            self._is_xdist_installed = __xdist_version__ >= "2.3.0"
+            self._is_xdist_installed = tuple(map(int, xdist_ver.split("."))) >= (2, 3, 0)
         except ImportError:
             self._is_xdist_installed = False
 
