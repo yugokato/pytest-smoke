@@ -46,9 +46,10 @@ def test_file_specs() -> list[TestFileSpec]:
             TestClassSpec("Test3", [TestFuncSpec(num_params=3), TestFuncSpec()], num_params=2),
         ]
     )
-    # file4: A test file with a mix of everything above
+    # file4: A test file with a mix of everything above, inside a sub directory
     test_file_spec4 = TestFileSpec(
-        [*test_file_spec1.test_specs, *test_file_spec2.test_specs, *test_file_spec3.test_specs]
+        [*test_file_spec1.test_specs, *test_file_spec2.test_specs, *test_file_spec3.test_specs],
+        test_dir="tests_something1",
     )
     return [test_file_spec1, test_file_spec2, test_file_spec3, test_file_spec4]
 
@@ -58,5 +59,8 @@ def generate_test_files(pytester: Pytester, test_file_specs: list[TestFileSpec])
     """Generate test files with given test file specs"""
     test_files = {}
     for i, test_file_spec in enumerate(test_file_specs, start=1):
-        test_files[f"test_{i}"] = generate_test_code(test_file_spec)
+        test_filename = f"test_{i}"
+        if test_dir := test_file_spec.test_dir:
+            test_filename = test_dir + os.sep + test_filename
+        test_files[test_filename] = generate_test_code(test_file_spec)
     pytester.makepyfile(**test_files)

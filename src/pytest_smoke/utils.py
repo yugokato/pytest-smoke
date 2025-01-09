@@ -61,7 +61,11 @@ def generate_group_id(item: Item, scope: str) -> Optional[str]:
     if not cls and scope == SmokeScope.CLASS:
         return
 
-    group_id = str(item.path or item.location[0])
+    file_path = item.path
+    if scope == SmokeScope.DIRECTORY:
+        return str(file_path.parent)
+
+    group_id = str(file_path)
     if scope == SmokeScope.FILE:
         return group_id
 

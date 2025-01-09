@@ -64,8 +64,8 @@ def pytest_addoption(parser: Parser):
         nargs="?",
         default=False,
         help="Run only N tests from each test function or specified scope.\n"
-        "If N is explicitly provided to the option, it can be a number (e.g. 5) or a percentage (e.g. 10%%).\n"
-        "Otherwise, the default value of 1 will be applied.",
+        "N can be a number (e.g. 5) or a percentage (e.g. 10%%).\n"
+        "If not provided, the default value is 1.",
     )
     group.addoption(
         "--smoke-scope",
@@ -80,6 +80,7 @@ def pytest_addoption(parser: Parser):
             f"- {SmokeScope.AUTO}: Applies {SmokeScope.FUNCTION} scope for test functions, "
             f"{SmokeScope.CLASS} scope for test methods\n"
             f"- {SmokeScope.FILE}: Applies to each test file\n"
+            f"- {SmokeScope.DIRECTORY}: Applies to each test directory\n"
             f"- {SmokeScope.ALL}: Applies to the entire test suite"
         ),
     )
