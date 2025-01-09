@@ -7,8 +7,9 @@ versions](https://img.shields.io/pypi/pyversions/pytest-smoke.svg)](https://pypi
 [![test](https://github.com/yugokato/pytest-smoke/actions/workflows/test.yml/badge.svg?branch=main)](https://github.com/yugokato/pytest-smoke/actions/workflows/test.yml?query=branch%3Amain)
 [![Code style ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://docs.astral.sh/ruff/)
 
-`pytest-smoke` is a `pytest` plugin designed to quickly perform smoke testing on large test suites. It helps you scale 
-down test execution by running a smaller subset of tests from each function (or specified scope).
+`pytest-smoke` is a `pytest` plugin designed to quickly perform smoke testing on large test suites. It allows you to 
+scale down test execution by limiting the number of tests run from each test function or specified scope to a smaller 
+subset, defined by a value of `N`.
 
 
 ## Installation
