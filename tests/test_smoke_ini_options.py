@@ -14,13 +14,6 @@ if smoke.is_xdist_installed:
     from pytest_smoke.extensions.xdist import SmokeScopeScheduling
 
 
-SMOKE_INI_OPTIONS = [
-    SmokeIniOption.SMOKE_DEFAULT_N,
-    SmokeIniOption.SMOKE_DEFAULT_SCOPE,
-    pytest.param(SmokeIniOption.SMOKE_DEFAULT_XDIST_DIST_BY_SCOPE, marks=requires_xdist),
-]
-
-
 def test_smoke_ini_option_smoke_default_n(pytester: Pytester):
     """Test smoke_default_n INI option"""
     num_tests = 10
@@ -156,7 +149,13 @@ def test_smoke_ini_option_smoke_marked_tests_as_critical(pytester: Pytester, val
     result.assert_outcomes(passed=num_passes, deselected=num_tests_1 + num_tests_2 - num_passes)
 
 
-@pytest.mark.parametrize("ini_option", SMOKE_INI_OPTIONS)
+@pytest.mark.parametrize(
+    "ini_option",
+    [
+        pytest.param(x, marks=requires_xdist if x == SmokeIniOption.SMOKE_DEFAULT_XDIST_DIST_BY_SCOPE else [])
+        for x in SmokeIniOption
+    ],
+)
 @pytest.mark.parametrize("value", ["foo", ""])
 def test_smoke_ini_option_with_invalid_value(pytester: Pytester, ini_option: str, value: str):
     """Test INI options with an invalid value are handled as a usage error"""
