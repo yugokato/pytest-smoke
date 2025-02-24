@@ -37,7 +37,7 @@ dynamic = ["version"]
 [project.optional-dependencies]
 lint = [
     "pre-commit>=3.0.0,<5",
-    "ruff==0.9.6",
+    "ruff==0.9.7",
 ]
 test = [
     "pytest-mock>=3.0.0,<4",
