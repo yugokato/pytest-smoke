@@ -4,7 +4,7 @@ from collections import Counter
 from dataclasses import dataclass, field
 from enum import auto
 from functools import cached_property
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from pytest import Config, Item
@@ -53,31 +53,32 @@ class SmokeOption:
                 # N was not explicitly provided to the option. Apply the INI config value or the plugin default
                 n = self._parse_ini_option(SmokeIniOption.SMOKE_DEFAULT_N)
             return n
+        return None
 
     @cached_property
     def scope(self) -> str:
         scope = self.config.option.smoke_scope or self._parse_ini_option(SmokeIniOption.SMOKE_DEFAULT_SCOPE)
-        assert scope
+        assert scope and isinstance(scope, str)
         return scope
 
     @cached_property
     def select_mode(self) -> str:
         mode = self.config.option.smoke_select_mode or self._parse_ini_option(SmokeIniOption.SMOKE_DEFAULT_SELECT_MODE)
-        assert mode
+        assert mode and isinstance(mode, str)
         return mode
 
     @cached_property
     def is_scale(self) -> bool:
         return isinstance(self.n, str) and self.n.endswith("%")
 
-    def _parse_ini_option(self, option: SmokeIniOption):
+    def _parse_ini_option(self, option: SmokeIniOption) -> str | int | float | bool:
         from pytest_smoke.utils import parse_ini_option
 
         return parse_ini_option(self.config, option)
 
 
 class SmokeMarker:
-    def __init__(self, *args, mustpass: bool = False, runif: bool = True, **kwargs):
+    def __init__(self, *args: Any, mustpass: bool = False, runif: bool = True, **kwargs: Any) -> None:
         self.mustpass = bool(mustpass)
         self.runif = bool(runif)
 
@@ -85,6 +86,7 @@ class SmokeMarker:
     def from_item(cls, item: Item) -> SmokeMarker | None:
         if marker := item.get_closest_marker("smoke"):
             return cls(*marker.args, **marker.kwargs)
+        return None
 
 
 @dataclass
@@ -95,6 +97,6 @@ class MustpassCounter:
 
 @dataclass
 class SmokeCounter:
-    collected: Counter = field(default_factory=Counter)
-    selected: Counter = field(default_factory=Counter)
+    collected: Counter[str] = field(default_factory=Counter)
+    selected: Counter[str] = field(default_factory=Counter)
     mustpass: MustpassCounter = field(default_factory=MustpassCounter)

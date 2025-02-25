@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from pytest import hookspec
 
@@ -9,7 +9,7 @@ if TYPE_CHECKING:
 
 
 @hookspec(firstresult=True)
-def pytest_smoke_generate_group_id(item: Item, scope: str):
+def pytest_smoke_generate_group_id(item: Item, scope: str) -> Any | None:
     """Return a smoke scope group ID for the predefined or custom scopes
 
     Use this hook to either override the logic of the predefined scopes or to implement logic for your own scopes
@@ -18,7 +18,7 @@ def pytest_smoke_generate_group_id(item: Item, scope: str):
 
 
 @hookspec(firstresult=True)
-def pytest_smoke_include(item: Item, scope: str):
+def pytest_smoke_include(item: Item, scope: str) -> bool | None:
     """Return True for tests that should be included as "additional" smoke tests
 
     NOTE: These items will not be counted towards the calculation of N
@@ -26,7 +26,7 @@ def pytest_smoke_include(item: Item, scope: str):
 
 
 @hookspec(firstresult=True)
-def pytest_smoke_exclude(item: Item, scope: str):
+def pytest_smoke_exclude(item: Item, scope: str) -> bool | None:
     """Return True for tests that should not be selected
 
     NOTE:
@@ -36,7 +36,7 @@ def pytest_smoke_exclude(item: Item, scope: str):
 
 
 @hookspec(firstresult=True)
-def pytest_smoke_sort_by_select_mode(items: list[Item], scope: str, select_mode: str):
+def pytest_smoke_sort_by_select_mode(items: list[Item], scope: str, select_mode: str) -> list[Item] | None:
     """Return sorted items to implement a test selection logic for the custom select mode.
     The plugin will pick N tests from each scope group based on the sorted items, meaning that an item appearing
     earlier in the same scope group has a higher chance of being selected.

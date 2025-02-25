@@ -7,7 +7,7 @@ except PackageNotFoundError:
 
 
 class PytestSmoke:
-    def __init__(self):
+    def __init__(self) -> None:
         try:
             from xdist import __version__ as xdist_ver
 
@@ -20,7 +20,7 @@ class PytestSmoke:
         return self._is_xdist_installed
 
     @is_xdist_installed.setter
-    def is_xdist_installed(self, v: bool):
+    def is_xdist_installed(self, v: bool) -> None:
         self._is_xdist_installed = v
 
 

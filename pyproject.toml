@@ -36,6 +36,7 @@ dynamic = ["version"]
 
 [project.optional-dependencies]
 lint = [
+    "mypy==1.5.0",
     "pre-commit>=3.0.0,<5",
     "ruff==0.9.7",
 ]
@@ -77,3 +78,21 @@ select = [
 
 [tool.ruff.lint.pyupgrade]
 keep-runtime-typing = true
+
+
+[tool.mypy]
+files = [
+    "src"
+]
+mypy_path = [
+    "src"
+]
+follow_imports = "skip"
+check_untyped_defs = true
+disallow_any_generics = true
+disallow_untyped_defs = true
+ignore_missing_imports = true
+strict_equality = true
+warn_redundant_casts = true
+warn_unreachable = true
+warn_unused_ignores = true
