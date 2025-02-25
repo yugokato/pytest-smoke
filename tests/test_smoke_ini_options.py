@@ -1,5 +1,6 @@
+from __future__ import annotations
+
 import re
-from typing import Optional
 
 import pytest
 from pytest import ExitCode, Pytester
@@ -66,7 +67,7 @@ def test_smoke_ini_option_smoke_default_select_mode(pytester: Pytester):
 @pytest.mark.parametrize("dist_option", [None, "--dist=load", "-d"])
 @pytest.mark.parametrize("value", ["true", "false", None])
 def test_smoke_ini_option_smoke_default_xdist_dist_by_scope(
-    pytester: Pytester, value: Optional[str], dist_option: Optional[str]
+    pytester: Pytester, value: str | None, dist_option: str | None
 ):
     """Test smoke_default_xdist_dist_by_scope INI option.
 
@@ -116,7 +117,7 @@ def test_smoke_ini_option_smoke_default_xdist_dist_by_scope(
 
 
 @pytest.mark.parametrize("value", [None, "true", "false"])
-def test_smoke_ini_option_smoke_marked_tests_as_critical(pytester: Pytester, value: Optional[str]):
+def test_smoke_ini_option_smoke_marked_tests_as_critical(pytester: Pytester, value: str | None):
     """Test smoke_marked_tests_as_critical INI option"""
     is_enabled = value == "true"
     num_tests_1 = 5

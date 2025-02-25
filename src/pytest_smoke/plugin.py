@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import os
 from collections import Counter
-from typing import TYPE_CHECKING, Optional, Union
+from collections.abc import Generator, Mapping
+from typing import TYPE_CHECKING, Any, cast
 from uuid import uuid4
 
 import pytest
@@ -47,13 +48,13 @@ DEFAULT_N = SmokeDefaultN(1)
 
 
 @pytest.hookimpl(trylast=True)
-def pytest_addhooks(pluginmanager: PytestPluginManager):
+def pytest_addhooks(pluginmanager: PytestPluginManager) -> None:
     from pytest_smoke import hooks
 
     pluginmanager.add_hookspecs(hooks)
 
 
-def pytest_addoption(parser: Parser):
+def pytest_addoption(parser: Parser) -> None:
     group = parser.getgroup("smoke", description="Smoke testing")
     group.addoption(
         "--smoke",
@@ -132,7 +133,7 @@ def pytest_addoption(parser: Parser):
 
 
 @pytest.hookimpl(tryfirst=True)
-def pytest_configure(config: Config):
+def pytest_configure(config: Config) -> None:
     if not config.option.smoke and (config.option.smoke_scope or config.option.smoke_select_mode):
         raise pytest.UsageError("The --smoke option is requierd to use the pytest-smoke functionality")
 
@@ -157,19 +158,19 @@ def pytest_configure(config: Config):
 
 
 @pytest.hookimpl(wrapper=True, tryfirst=True)
-def pytest_sessionstart(session: Session):
+def pytest_sessionstart(session: Session) -> Generator[None, Any, Any]:
     if not smoke.is_xdist_installed or not is_xdist_worker(session):
         os.environ[SmokeEnvVar.SMOKE_TEST_SESSION_UUID] = str(uuid4())
     return (yield)
 
 
 @pytest.hookimpl(wrapper=True, trylast=True)
-def pytest_collection_modifyitems(session: Session, config: Config, items: list[Item]):
+def pytest_collection_modifyitems(session: Session, config: Config, items: list[Item]) -> Generator[None, Any, None]:
     try:
         return (yield)
     finally:
         if not items:
-            return
+            return None
 
         opt = SmokeOption(config)
         if opt.n:
@@ -208,7 +209,10 @@ def pytest_collection_modifyitems(session: Session, config: Config, items: list[
                     deselected_items.append(item)
                     continue
 
-                threshold = scale_down(counter.collected[group_id], float(opt.n[:-1])) if opt.is_scale else opt.n
+                if opt.is_scale:
+                    threshold = scale_down(counter.collected[group_id], float(cast(str, opt.n)[:-1]))
+                else:
+                    threshold = cast(int, opt.n)
                 if counter.selected[group_id] < threshold:
                     counter.selected.update([group_id])
                     selected_items_regular.append(item)
@@ -232,7 +236,7 @@ def pytest_collection_modifyitems(session: Session, config: Config, items: list[
 
 
 @pytest.hookimpl(wrapper=True)
-def pytest_runtest_protocol(item: Item, nextitem: Optional[Item]):
+def pytest_runtest_protocol(item: Item, nextitem: Item | None) -> Generator[None, Any, None]:
     try:
         return (yield)
     finally:
@@ -245,7 +249,7 @@ def pytest_runtest_protocol(item: Item, nextitem: Optional[Item]):
 
 
 @pytest.hookimpl(tryfirst=True)
-def pytest_runtest_setup(item: Item):
+def pytest_runtest_setup(item: Item) -> None:
     if item.session.stash.get(STASH_KEY_SMOKE_SHOULD_SKIP_RESET, False):
         counter = item.session.stash[STASH_KEY_SMOKE_COUNTER].mustpass
         num_selected = len(counter.selected)
@@ -254,8 +258,8 @@ def pytest_runtest_setup(item: Item):
 
 
 @pytest.hookimpl(wrapper=True)
-def pytest_runtest_makereport(item: Item):
-    report: TestReport = yield
+def pytest_runtest_makereport(item: Item) -> Generator[None, TestReport, TestReport]:
+    report = yield
     if item.stash.get(STASH_KEY_SMOKE_IS_MUSTPASS, False):
         setattr(report, "_is_smoke_must_pass", True)
         if report.failed:
@@ -264,8 +268,10 @@ def pytest_runtest_makereport(item: Item):
 
 
 @pytest.hookimpl(wrapper=True, trylast=True)
-def pytest_report_teststatus(report: TestReport):
-    status: Union[tuple, TestShortLogReport] = yield
+def pytest_report_teststatus(
+    report: TestReport,
+) -> Generator[None, TestShortLogReport | tuple[str, str, str | tuple[str, Mapping[str, bool]]], TestShortLogReport]:
+    status = yield
     if not isinstance(status, TestShortLogReport):
         status = TestShortLogReport(*status)
     if status.word and getattr(report, "_is_smoke_must_pass", False):
@@ -273,5 +279,5 @@ def pytest_report_teststatus(report: TestReport):
         if isinstance(status.word, str):
             status = status._replace(word=status.word + annot)
         elif isinstance(status.word, tuple):
-            status = status._replace(word=([status.word[0] + annot, *status.word[1:]]))
+            status = status._replace(word=(status.word[0] + annot, *status.word[1:]))
     return status

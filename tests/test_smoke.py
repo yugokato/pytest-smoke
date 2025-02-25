@@ -1,5 +1,6 @@
+from __future__ import annotations
+
 import re
-from typing import Optional
 
 import pytest
 from pytest import ExitCode, Pytester
@@ -58,7 +59,7 @@ def test_smoke_no_option(pytester: Pytester, test_file_specs: list[TestFileSpec]
 @pytest.mark.usefixtures("generate_test_files")
 @pytest.mark.parametrize("scope", [None, *SmokeScope])
 @pytest.mark.parametrize("n", [None, "1", "5", "15", "25", "35", str(2**32 - 1), "1%", "1.23%", "10%", "33%", "100%"])
-def test_smoke_n(pytester: Pytester, test_file_specs: list[TestFileSpec], n: Optional[str], scope: Optional[str]):
+def test_smoke_n(pytester: Pytester, test_file_specs: list[TestFileSpec], n: str | None, scope: str | None):
     """Test various smoke N values with/without a smoke scope"""
     num_all_tests = get_num_tests(*test_file_specs)
     num_tests_to_be_selected = get_num_tests_to_be_selected(test_file_specs, n, scope)
@@ -73,7 +74,7 @@ def test_smoke_n(pytester: Pytester, test_file_specs: list[TestFileSpec], n: Opt
 
 
 @pytest.mark.parametrize("select_mode", [None, *SmokeSelectMode])
-def test_smoke_select_mode(pytester: Pytester, select_mode: Optional[str]):
+def test_smoke_select_mode(pytester: Pytester, select_mode: str | None):
     """Test the predefined test selection logic with/without the --smoke-select-mode option"""
     smoke_n = 5
     num_tests = 100
@@ -111,7 +112,7 @@ def test_smoke_select_mode(pytester: Pytester, select_mode: Optional[str]):
 @pytest.mark.parametrize("num_fails", [0, 1, 2])
 @pytest.mark.parametrize("runif", [None, False, True])
 @pytest.mark.parametrize("mustpass", [None, False, True])
-def test_smoke_marker_critical_tests(pytester: Pytester, mustpass: bool, runif: Optional[bool], num_fails: int):
+def test_smoke_marker_critical_tests(pytester: Pytester, mustpass: bool, runif: bool | None, num_fails: int):
     """Test @pytest.mark.smoke marker with/without the optional mustpass and runif kwargs"""
 
     def is_critical(i):
@@ -213,7 +214,7 @@ def test_smoke_marker_critical_tests(pytester: Pytester, mustpass: bool, runif: 
 @pytest.mark.parametrize("select_mode", [None, *SmokeSelectMode])
 @pytest.mark.parametrize("scope", [None, *SmokeScope])
 def test_smoke_xdist(
-    pytester: Pytester, test_file_specs: list[TestFileSpec], scope: Optional[str], select_mode: Optional[str]
+    pytester: Pytester, test_file_specs: list[TestFileSpec], scope: str | None, select_mode: str | None
 ):
     """Test basic plugin functionality with pytest-xdist.
 
@@ -237,7 +238,7 @@ def test_smoke_xdist(
 
 @requires_xdist
 @pytest.mark.parametrize("select_mode", [None, *SmokeSelectMode])
-def test_smoke_xdist_disabled(pytester: Pytester, select_mode: Optional[str]):
+def test_smoke_xdist_disabled(pytester: Pytester, select_mode: str | None):
     """Test that pytest-smoke does not access the pytest-xdist plugin when it is install but explicitly disabled"""
     assert smoke.is_xdist_installed
     num_tests = 10

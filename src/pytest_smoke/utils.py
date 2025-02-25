@@ -4,7 +4,8 @@ import os
 import random
 from decimal import ROUND_HALF_UP, Decimal
 from functools import lru_cache
-from typing import TYPE_CHECKING, Optional, Union
+from types import ModuleType
+from typing import TYPE_CHECKING
 from uuid import UUID
 
 import pytest
@@ -35,7 +36,7 @@ def scale_down(value: float, percentage: float, precision: int = 0, min_value: i
 
 
 @lru_cache
-def generate_group_id(item: Item, scope: str) -> Optional[str]:
+def generate_group_id(item: Item, scope: str) -> str | None:
     """Generate a smoke scope group ID for the item
 
     :param item: Collected Pytest item
@@ -43,7 +44,7 @@ def generate_group_id(item: Item, scope: str) -> Optional[str]:
     """
     assert scope
     if item.config.hook.pytest_smoke_exclude(item=item, scope=scope):
-        return
+        return None
 
     if (group_id := item.config.hook.pytest_smoke_generate_group_id(item=item, scope=scope)) is not None:
         return group_id
@@ -59,7 +60,7 @@ def generate_group_id(item: Item, scope: str) -> Optional[str]:
 
     cls = getattr(item, "cls", None)
     if not cls and scope == SmokeScope.CLASS:
-        return
+        return None
 
     file_path = item.path
     if scope == SmokeScope.DIRECTORY:
@@ -75,7 +76,7 @@ def generate_group_id(item: Item, scope: str) -> Optional[str]:
             return group_id
 
     # The default scope
-    func_name = item.function.__name__  # type: ignore
+    func_name = item.function.__name__
     group_id += f"::{func_name}"
     return group_id
 
@@ -92,6 +93,7 @@ def sort_items(items: list[Item], session: Session, smoke_option: SmokeOption) -
     elif smoke_option.select_mode == SmokeSelectMode.LAST:
         sorted_items = items[::-1]
     elif smoke_option.select_mode == SmokeSelectMode.RANDOM:
+        random_: random.Random | ModuleType
         if smoke.is_xdist_installed and (is_xdist_controller(session) or is_xdist_worker(session)):
             # Set the seed to ensure XDIST controler and workers collect the same items
             random_ = random.Random(UUID(os.environ[SmokeEnvVar.SMOKE_TEST_SESSION_UUID]).time)
@@ -110,7 +112,7 @@ def sort_items(items: list[Item], session: Session, smoke_option: SmokeOption) -
     return sorted_items
 
 
-def parse_n(value: str) -> Union[int, str]:
+def parse_n(value: str) -> int | float | str:
     v = value.strip()
     try:
         if is_scale := v.endswith("%"):
@@ -143,7 +145,7 @@ def parse_scope(value: str) -> str:
     return v
 
 
-def parse_ini_option(config: Config, option: SmokeIniOption) -> Union[str, int, bool]:
+def parse_ini_option(config: Config, option: SmokeIniOption) -> str | int | float | bool:
     try:
         v = config.getini(option)
         if option == SmokeIniOption.SMOKE_DEFAULT_N:

@@ -1,3 +1,7 @@
+from __future__ import annotations
+
+from typing import Any
+
 from pytest import Config, Item, Session, hookimpl
 
 from pytest_smoke import smoke
@@ -8,6 +12,19 @@ if smoke.is_xdist_installed:
     from xdist import is_xdist_controller
     from xdist.scheduler import LoadScopeScheduling
 
+    class SmokeScopeScheduling(LoadScopeScheduling):
+        """A custom pytest-xdist scheduler that distributes workloads by smoke scope groups"""
+
+        def __init__(self, config: Config, log: Any, *, nodes: dict[str, Item]) -> None:
+            super().__init__(config, log)
+            self.smoke_option = SmokeOption(config)
+            self._nodes = nodes
+
+        def _split_scope(self, nodeid: str) -> str:
+            item = self._nodes[nodeid]
+
+            return generate_group_id(item, self.smoke_option.scope) or super()._split_scope(nodeid)
+
     class PytestSmokeXdist:
         """A plugin that extends pytest-smoke to seamlesslly support pytest-xdist
 
@@ -16,16 +33,17 @@ if smoke.is_xdist_installed:
 
         name = "smoke-xdist"
 
-        def __init__(self):
-            self._nodes = None
+        def __init__(self) -> None:
+            self._nodes: dict[str, Item] = {}
 
         @hookimpl(tryfirst=True)
-        def pytest_collection(self, session: Session):
+        def pytest_collection(self, session: Session) -> bool | None:
             if is_xdist_controller(session):
                 self._nodes = {item.nodeid: item for item in session.perform_collect()}
                 return True
+            return None
 
-        def pytest_xdist_make_scheduler(self, config: Config, log):
+        def pytest_xdist_make_scheduler(self, config: Config, log: Any) -> SmokeScopeScheduling | None:
             """Replace the pytest-xdist default scheduler (load) with our custom scheduler (smoke scope) when the
             following conditions match:
             - The INI option value is set to true
@@ -37,16 +55,4 @@ if smoke.is_xdist_installed:
                 and parse_ini_option(config, SmokeIniOption.SMOKE_DEFAULT_XDIST_DIST_BY_SCOPE)
             ):
                 return SmokeScopeScheduling(config, log, nodes=self._nodes)
-
-    class SmokeScopeScheduling(LoadScopeScheduling):
-        """A custom pytest-xdist scheduler that distributes workloads by smoke scope groups"""
-
-        def __init__(self, config: Config, log, *, nodes: dict[str, Item]):
-            super().__init__(config, log)
-            self.smoke_option = SmokeOption(config)
-            self._nodes = nodes
-
-        def _split_scope(self, nodeid: str) -> str:
-            item = self._nodes[nodeid]
-
-            return generate_group_id(item, self.smoke_option.scope) or super()._split_scope(nodeid)
+            return None
