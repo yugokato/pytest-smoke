@@ -4,7 +4,7 @@ import os
 import random
 from decimal import ROUND_HALF_UP, Decimal
 from functools import lru_cache
-from typing import TYPE_CHECKING, Optional, Union
+from typing import TYPE_CHECKING
 from uuid import UUID
 
 import pytest
@@ -35,7 +35,7 @@ def scale_down(value: float, percentage: float, precision: int = 0, min_value: i
 
 
 @lru_cache
-def generate_group_id(item: Item, scope: str) -> Optional[str]:
+def generate_group_id(item: Item, scope: str) -> str | None:
     """Generate a smoke scope group ID for the item
 
     :param item: Collected Pytest item
@@ -110,7 +110,7 @@ def sort_items(items: list[Item], session: Session, smoke_option: SmokeOption) -
     return sorted_items
 
 
-def parse_n(value: str) -> Union[int, str]:
+def parse_n(value: str) -> int | str:
     v = value.strip()
     try:
         if is_scale := v.endswith("%"):
@@ -143,7 +143,7 @@ def parse_scope(value: str) -> str:
     return v
 
 
-def parse_ini_option(config: Config, option: SmokeIniOption) -> Union[str, int, bool]:
+def parse_ini_option(config: Config, option: SmokeIniOption) -> str | int | bool:
     try:
         v = config.getini(option)
         if option == SmokeIniOption.SMOKE_DEFAULT_N:

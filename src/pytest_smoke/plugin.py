@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import os
 from collections import Counter
-from typing import TYPE_CHECKING, Optional, Union
+from typing import TYPE_CHECKING
 from uuid import uuid4
 
 import pytest
@@ -232,7 +232,7 @@ def pytest_collection_modifyitems(session: Session, config: Config, items: list[
 
 
 @pytest.hookimpl(wrapper=True)
-def pytest_runtest_protocol(item: Item, nextitem: Optional[Item]):
+def pytest_runtest_protocol(item: Item, nextitem: Item | None):
     try:
         return (yield)
     finally:
@@ -265,7 +265,7 @@ def pytest_runtest_makereport(item: Item):
 
 @pytest.hookimpl(wrapper=True, trylast=True)
 def pytest_report_teststatus(report: TestReport):
-    status: Union[tuple, TestShortLogReport] = yield
+    status: tuple | TestShortLogReport = yield
     if not isinstance(status, TestShortLogReport):
         status = TestShortLogReport(*status)
     if status.word and getattr(report, "_is_smoke_must_pass", False):

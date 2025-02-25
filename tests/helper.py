@@ -6,7 +6,6 @@ from contextlib import contextmanager, nullcontext
 from dataclasses import dataclass, field
 from functools import wraps
 from itertools import chain
-from typing import Optional
 
 import pytest
 
@@ -28,7 +27,7 @@ class TestFileSpec:
     __test__ = False
 
     test_specs: list[TestFuncSpec | TestClassSpec] = field(default_factory=list)
-    test_dir: Optional[str] = None
+    test_dir: str | None = None
 
 
 @dataclass

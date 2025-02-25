@@ -4,7 +4,7 @@ from collections import Counter
 from dataclasses import dataclass, field
 from enum import auto
 from functools import cached_property
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from pytest import Config, Item
@@ -47,7 +47,7 @@ class SmokeOption:
         self.config = config
 
     @cached_property
-    def n(self) -> Optional[int, str]:
+    def n(self) -> int | str | None:
         if n := self.config.option.smoke:
             if isinstance(n, SmokeDefaultN):
                 # N was not explicitly provided to the option. Apply the INI config value or the plugin default
@@ -82,7 +82,7 @@ class SmokeMarker:
         self.runif = bool(runif)
 
     @classmethod
-    def from_item(cls, item: Item) -> Optional[SmokeMarker]:
+    def from_item(cls, item: Item) -> SmokeMarker | None:
         if marker := item.get_closest_marker("smoke"):
             return cls(*marker.args, **marker.kwargs)
 
