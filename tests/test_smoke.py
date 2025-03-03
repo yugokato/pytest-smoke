@@ -8,7 +8,6 @@ from pytest import ExitCode, Pytester
 from pytest_smoke import smoke
 from pytest_smoke.types import SmokeIniOption, SmokeScope, SmokeSelectMode
 from tests.helper import (
-    PARAMETRIZED_ARG_NAME_FUNC,
     TEST_NAME_BASE,
     TestFileSpec,
     TestFuncSpec,
@@ -19,7 +18,7 @@ from tests.helper import (
 )
 
 
-def test_smoke_command_help(pytester: Pytester):
+def test_smoke_command_help(pytester: Pytester) -> None:
     """Test pytest command help for this plugin"""
     result = pytester.runpytest("-h")
     assert result.ret == ExitCode.OK, str(result.stderr)
@@ -40,7 +39,7 @@ def test_smoke_command_help(pytester: Pytester):
     assert re.search(pattern2, stdout, re.DOTALL)
 
 
-def test_smoke_show_markers(pytester: Pytester):
+def test_smoke_show_markers(pytester: Pytester) -> None:
     """Test the custom marker information provided by the plugin"""
     result = pytester.runpytest("--markers")
     assert result.ret == ExitCode.OK
@@ -48,7 +47,7 @@ def test_smoke_show_markers(pytester: Pytester):
 
 
 @pytest.mark.usefixtures("generate_test_files")
-def test_smoke_no_option(pytester: Pytester, test_file_specs: list[TestFileSpec]):
+def test_smoke_no_option(pytester: Pytester, test_file_specs: list[TestFileSpec]) -> None:
     """Test the plugin does not affect pytest when no plugin options are given"""
     num_all_tests = get_num_tests(*test_file_specs)
     result = pytester.runpytest()
@@ -59,7 +58,7 @@ def test_smoke_no_option(pytester: Pytester, test_file_specs: list[TestFileSpec]
 @pytest.mark.usefixtures("generate_test_files")
 @pytest.mark.parametrize("scope", [None, *SmokeScope])
 @pytest.mark.parametrize("n", [None, "1", "5", "15", "25", "35", str(2**32 - 1), "1%", "1.23%", "10%", "33%", "100%"])
-def test_smoke_n(pytester: Pytester, test_file_specs: list[TestFileSpec], n: str | None, scope: str | None):
+def test_smoke_n(pytester: Pytester, test_file_specs: list[TestFileSpec], n: str | None, scope: str | None) -> None:
     """Test various smoke N values with/without a smoke scope"""
     num_all_tests = get_num_tests(*test_file_specs)
     num_tests_to_be_selected = get_num_tests_to_be_selected(test_file_specs, n, scope)
@@ -74,7 +73,7 @@ def test_smoke_n(pytester: Pytester, test_file_specs: list[TestFileSpec], n: str
 
 
 @pytest.mark.parametrize("select_mode", [None, *SmokeSelectMode])
-def test_smoke_select_mode(pytester: Pytester, select_mode: str | None):
+def test_smoke_select_mode(pytester: Pytester, select_mode: str | None) -> None:
     """Test the predefined test selection logic with/without the --smoke-select-mode option"""
     smoke_n = 5
     num_tests = 100
@@ -112,13 +111,13 @@ def test_smoke_select_mode(pytester: Pytester, select_mode: str | None):
 @pytest.mark.parametrize("num_fails", [0, 1, 2])
 @pytest.mark.parametrize("runif", [None, False, True])
 @pytest.mark.parametrize("mustpass", [None, False, True])
-def test_smoke_marker_critical_tests(pytester: Pytester, mustpass: bool, runif: bool | None, num_fails: int):
+def test_smoke_marker_critical_tests(pytester: Pytester, mustpass: bool, runif: bool | None, num_fails: int) -> None:
     """Test @pytest.mark.smoke marker with/without the optional mustpass and runif kwargs"""
 
-    def is_critical(i):
+    def is_critical(i: int) -> bool:
         return bool(i % 2)
 
-    def param_marker(i):
+    def param_marker(i: int) -> str | None:
         mark = "smoke"
         if is_critical(i):
             kwargs = {}
@@ -141,7 +140,7 @@ def test_smoke_marker_critical_tests(pytester: Pytester, mustpass: bool, runif: 
     test2_pos_critical = list(filter(is_critical, range(num_tests_2)))
     test2_pos_mustpass = test2_pos_critical[:num_mustpass]
     test2_pos_with_runif = test2_pos_critical[-num_critical_with_runif:]
-    func_body = f"\tassert {PARAMETRIZED_ARG_NAME_FUNC} not in {test2_pos_mustpass[:num_fails]}" if num_fails else None
+    func_body = f"\tassert {TestFuncSpec.param_arg_name} not in {test2_pos_mustpass[:num_fails]}" if num_fails else None
     test_file_spec = TestFileSpec(
         [
             TestFuncSpec(num_params=num_tests_1),
@@ -214,7 +213,7 @@ def test_smoke_marker_critical_tests(pytester: Pytester, mustpass: bool, runif: 
 @pytest.mark.parametrize("scope", [None, *SmokeScope])
 def test_smoke_xdist(
     pytester: Pytester, test_file_specs: list[TestFileSpec], scope: str | None, select_mode: str | None
-):
+) -> None:
     """Test basic plugin functionality with pytest-xdist.
 
     The plugin should handle the following points:
@@ -237,7 +236,7 @@ def test_smoke_xdist(
 
 @requires_xdist
 @pytest.mark.parametrize("select_mode", [None, *SmokeSelectMode])
-def test_smoke_xdist_disabled(pytester: Pytester, select_mode: str | None):
+def test_smoke_xdist_disabled(pytester: Pytester, select_mode: str | None) -> None:
     """Test that pytest-smoke does not access the pytest-xdist plugin when it is install but explicitly disabled"""
     assert smoke.is_xdist_installed
     num_tests = 10
@@ -253,7 +252,7 @@ def test_smoke_xdist_disabled(pytester: Pytester, select_mode: str | None):
 
 @pytest.mark.filterwarnings("ignore::pluggy.PluggyTeardownRaisedWarning")
 @pytest.mark.parametrize("n", ["-1", "0", "0.5", "1.1", "foo", " -1%", "0%", "101%", "bar%"])
-def test_smoke_invalid_n(pytester: Pytester, n: str):
+def test_smoke_invalid_n(pytester: Pytester, n: str) -> None:
     """Test the option with invalid values"""
     result = pytester.runpytest("--smoke", n)
     assert result.ret == ExitCode.USAGE_ERROR
@@ -263,7 +262,7 @@ def test_smoke_invalid_n(pytester: Pytester, n: str):
 
 
 @pytest.mark.parametrize("option", ["--smoke-scope", "--smoke-select-mode"])
-def test_smoke_without_n_option(pytester: Pytester, option: str):
+def test_smoke_without_n_option(pytester: Pytester, option: str) -> None:
     """Test the --smoke option is required to use any functionality provided by the plugin"""
     result = pytester.runpytest(option, "foo")
     assert result.ret == ExitCode.USAGE_ERROR
