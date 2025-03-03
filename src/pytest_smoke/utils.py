@@ -120,7 +120,7 @@ def parse_n(value: str) -> int | float | str:
         else:
             num = int(v)
 
-        if num < 1 or is_scale and num > 100:
+        if num < 1 or (is_scale and num > 100):
             raise ValueError
 
         if is_scale:

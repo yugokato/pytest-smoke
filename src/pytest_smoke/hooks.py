@@ -29,9 +29,10 @@ def pytest_smoke_include(item: Item, scope: str) -> bool | None:
 def pytest_smoke_exclude(item: Item, scope: str) -> bool | None:
     """Return True for tests that should not be selected
 
-    NOTE:
+    Note:
         - These items will not be included in the total number of tests to which N% is applied
         - This hook takes precedence over any other options provided by the plugin
+
     """
 
 
@@ -41,7 +42,8 @@ def pytest_smoke_sort_by_select_mode(items: list[Item], scope: str, select_mode:
     The plugin will pick N tests from each scope group based on the sorted items, meaning that an item appearing
     earlier in the same scope group has a higher chance of being selected.
 
-    NOTE:
+    Note:
         - The hook is called only for custom select modes
         - This hook does not affect the test execution order
+
     """

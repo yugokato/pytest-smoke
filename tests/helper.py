@@ -39,7 +39,7 @@ class TestClassSpec:
     name: str
     test_func_specs: list[TestFuncSpec] = field(default_factory=list)
     num_params: int = 0
-    param_marker: Callable[[int], str | None] = None
+    param_marker: Callable[[int], str | None] | None = None
 
     def __post_init__(self):
         for test_func_spec in self.test_func_specs:
@@ -54,7 +54,7 @@ class TestFuncSpec:
 
     num_params: int = 0
     test_class_spec: TestClassSpec = field(init=False, default=None)
-    param_marker: Callable[[int], str | None] = None
+    param_marker: Callable[[int], str | None] | None = None
     func_body: str = None
 
 
@@ -69,7 +69,7 @@ def generate_test_code(test_spec: TestFileSpec | TestFuncSpec) -> str:
         *param_names: str,
         num_params: int = 0,
         with_indent: bool = False,
-        param_marker: Callable[[int], str | None] = None,
+        param_marker: Callable[[int], str | None] | None = None,
     ):
         nonlocal code
         params = ", ".join(param_names)

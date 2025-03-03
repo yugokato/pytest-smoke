@@ -33,7 +33,6 @@ dependencies = [
 ]
 dynamic = ["version"]
 
-
 [project.optional-dependencies]
 lint = [
     "mypy>=1.15.0,<2",
@@ -60,7 +59,6 @@ smoke = "pytest_smoke.plugin"
 [tool.setuptools.packages.find]
 where = ["src"]
 
-
 [tool.setuptools_scm]
 local_scheme = "no-local-version"
 
@@ -72,13 +70,24 @@ indent-width = 4
 select = [
     "E",    # pycodestyle
     "F",    # Pyflakes
+    "FA",   # flake8-future-annotations
     "I",    # isort
+    "PIE",  # flake8-pie
+    "PLC",  # Pylint convention
+    "PLE",  # Pylint error
+    "PLW",  # Pylint warning
+    "RUF",  # Ruff-specific rules
+    "T20",  # flake8-print
     "UP",   # pyupgrade
+    "W",    # pycodestyle warning
 ]
 
 [tool.ruff.lint.pyupgrade]
 keep-runtime-typing = true
 
+[tool.ruff.format]
+docstring-code-format = true
+docstring-code-line-length = "dynamic"
 
 [tool.mypy]
 files = [

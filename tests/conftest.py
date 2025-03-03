@@ -20,7 +20,7 @@ pytest_plugins = "pytester"
 def pytest_make_parametrize_id(val, argname):
     if isinstance(val, StrEnum):
         val = str(val)
-    return f"{argname}={repr(val)}"
+    return f"{argname}={val!r}"
 
 
 @pytest.fixture(autouse=True)

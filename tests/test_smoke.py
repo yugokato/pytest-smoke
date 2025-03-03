@@ -198,15 +198,14 @@ def test_smoke_marker_critical_tests(pytester: Pytester, mustpass: bool, runif: 
                 assert result_word == word + " (must-pass)"
             else:
                 assert result_word == word
+        # regular tests
+        elif mustpass and num_fails:
+            assert (
+                result_word == f"SKIPPED ({num_fails}/{len(test2_pos_mustpass)} must-pass "
+                f"smoke test{'s' if num_fails > 1 else ''} failed)"
+            )
         else:
-            # regular tests
-            if mustpass and num_fails:
-                assert (
-                    result_word == f"SKIPPED ({num_fails}/{len(test2_pos_mustpass)} must-pass "
-                    f"smoke test{'s' if num_fails > 1 else ''} failed)"
-                )
-            else:
-                assert result_word == "PASSED"
+            assert result_word == "PASSED"
 
 
 @requires_xdist
