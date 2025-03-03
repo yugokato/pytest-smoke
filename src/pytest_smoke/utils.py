@@ -5,10 +5,12 @@ import random
 from decimal import ROUND_HALF_UP, Decimal
 from functools import lru_cache
 from types import ModuleType
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 from uuid import UUID
 
 import pytest
+from _pytest.nodes import Node
+from pytest import Class, Function
 
 from pytest_smoke import smoke
 from pytest_smoke.types import SmokeEnvVar, SmokeIniOption, SmokeOption, SmokeScope, SmokeSelectMode
@@ -42,6 +44,13 @@ def generate_group_id(item: Item, scope: str) -> str | None:
     :param item: Collected Pytest item
     :param scope: Smoke scope
     """
+
+    def _generate_class_group_id(current_item: Node, class_id: str = "") -> str:
+        parent = current_item.parent
+        if isinstance(parent, Class):
+            return _generate_class_group_id(parent, class_id=f"::{parent.name}{class_id}")
+        return class_id
+
     assert scope
     if item.config.hook.pytest_smoke_exclude(item=item, scope=scope):
         return None
@@ -58,8 +67,8 @@ def generate_group_id(item: Item, scope: str) -> str | None:
     if scope == SmokeScope.ALL:
         return "*"
 
-    cls = getattr(item, "cls", None)
-    if not cls and scope == SmokeScope.CLASS:
+    is_class_method = isinstance(item.parent, Class)
+    if not is_class_method and scope == SmokeScope.CLASS:
         return None
 
     file_path = item.path
@@ -70,13 +79,13 @@ def generate_group_id(item: Item, scope: str) -> str | None:
     if scope == SmokeScope.FILE:
         return group_id
 
-    if cls:
-        group_id += f"::{cls.__name__}"
+    if is_class_method:
+        group_id += _generate_class_group_id(item)
         if scope in [SmokeScope.CLASS, SmokeScope.AUTO]:
             return group_id
 
-    # The default scope
-    func_name = item.function.__name__
+    # function scope
+    func_name = cast(Function, item).function.__name__
     group_id += f"::{func_name}"
     return group_id
 

@@ -1,4 +1,5 @@
 import os
+from typing import Any
 
 import pytest
 from pytest import Pytester
@@ -17,14 +18,14 @@ pytest_plugins = "pytester"
 
 
 @pytest.hookimpl(trylast=True)
-def pytest_make_parametrize_id(val, argname):
+def pytest_make_parametrize_id(val: Any, argname: str) -> str:
     if isinstance(val, StrEnum):
         val = str(val)
     return f"{argname}={val!r}"
 
 
 @pytest.fixture(autouse=True)
-def mock_is_xdist_installed(mocker: MockerFixture):
+def mock_is_xdist_installed(mocker: MockerFixture) -> None:
     """Mock the smoke.is_xdist_installed flag value to limit the effect of a change the plugin will make during some
     tests to be within a test
     """
@@ -44,6 +45,15 @@ def test_file_specs() -> list[TestFileSpec]:
             TestClassSpec("Test1", [TestFuncSpec(num_params=5), TestFuncSpec()]),
             TestClassSpec("Test2", [TestFuncSpec(num_params=5), TestFuncSpec(num_params=10)]),
             TestClassSpec("Test3", [TestFuncSpec(num_params=3), TestFuncSpec()], num_params=2),
+            TestClassSpec(
+                "Test4",
+                [TestFuncSpec()],
+                num_params=2,
+                nested_test_class_specs=[
+                    TestClassSpec("TestNested1", [TestFuncSpec(), TestFuncSpec(num_params=3)]),
+                    TestClassSpec("TestNested2", [TestFuncSpec(), TestFuncSpec(num_params=2)], num_params=3),
+                ],
+            ),
         ]
     )
     # file4: A test file with a mix of everything above, inside a sub directory
@@ -55,7 +65,7 @@ def test_file_specs() -> list[TestFileSpec]:
 
 
 @pytest.fixture
-def generate_test_files(pytester: Pytester, test_file_specs: list[TestFileSpec]):
+def generate_test_files(pytester: Pytester, test_file_specs: list[TestFileSpec]) -> None:
     """Generate test files with given test file specs"""
     test_files = {}
     for i, test_file_spec in enumerate(test_file_specs, start=1):

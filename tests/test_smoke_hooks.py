@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import re
 
 import pytest
@@ -8,7 +10,7 @@ from tests.helper import TEST_NAME_BASE, TestFuncSpec, generate_test_code
 
 
 @pytest.mark.parametrize("with_hook", [True, False])
-def test_smoke_hook_pytest_smoke_generate_group_id(pytester: Pytester, with_hook: bool):
+def test_smoke_hook_pytest_smoke_generate_group_id(pytester: Pytester, with_hook: bool) -> None:
     """Test pytest_smoke_generate_group_id hook and custome scopes, with/without hook definition"""
     custom_scope = "my-scope"
     num_tests = 10
@@ -38,7 +40,7 @@ def test_smoke_hook_pytest_smoke_generate_group_id(pytester: Pytester, with_hook
         result.assert_outcomes(passed=num_expected_selected_tests, deselected=num_tests - num_expected_selected_tests)
 
 
-def test_smoke_hook_pytest_smoke_include(pytester: Pytester):
+def test_smoke_hook_pytest_smoke_include(pytester: Pytester) -> None:
     """Test pytest_smoke_include hook"""
     num_tests = 10
     n = 2
@@ -59,7 +61,7 @@ def test_smoke_hook_pytest_smoke_include(pytester: Pytester):
 
 
 @pytest.mark.parametrize("n", ["2", "10", "100", "20%", "100%"])
-def test_smoke_hook_pytest_smoke_exclude(pytester: Pytester, n: str):
+def test_smoke_hook_pytest_smoke_exclude(pytester: Pytester, n: str) -> None:
     """Test pytest_smoke_exclude hook"""
     num_tests = 20
     divisor = 3
@@ -70,12 +72,13 @@ def test_smoke_hook_pytest_smoke_exclude(pytester: Pytester, n: str):
     else:
         num_expected_selected_tests = min([int(n), num_selectable_tests])
 
-    def param_marker(i):
+    def param_marker(i: int) -> str | None:
         reminder = i % divisor
         if reminder == 1:
             return "skip"
         elif reminder == 2:
             return "xfail"
+        return None
 
     pytester.makepyfile(generate_test_code(TestFuncSpec(num_params=num_tests, param_marker=param_marker)))
     pytester.makeconftest("""
@@ -90,7 +93,7 @@ def test_smoke_hook_pytest_smoke_exclude(pytester: Pytester, n: str):
 
 
 @pytest.mark.parametrize("with_hook", [True, False])
-def test_smoke_hook_pytest_smoke_sort_by_select_mode(pytester: Pytester, with_hook: bool):
+def test_smoke_hook_pytest_smoke_sort_by_select_mode(pytester: Pytester, with_hook: bool) -> None:
     """Test custom select mode using the pytest_smoke_sort_by_select_mode hook, with/without hook
     definition
     """
