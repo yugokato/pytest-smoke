@@ -63,6 +63,22 @@ class TestClassSpec:
 
         return get_arg_names(self)
 
+    @property
+    def has_parametrized_test(self) -> bool:
+        def is_test_class_parametrized(test_class_spec: TestClassSpec) -> bool:
+            return test_class_spec.num_params > 0 or (
+                test_class_spec.parent_test_class_spec is not None
+                and is_test_class_parametrized(test_class_spec.parent_test_class_spec)
+            )
+
+        if is_test_class_parametrized(self):
+            return True
+
+        for test_spec in self.test_func_specs:
+            if test_spec.num_params:
+                return True
+        return False
+
 
 @dataclass
 class TestFuncSpec:
@@ -75,6 +91,12 @@ class TestFuncSpec:
     test_class_spec: TestClassSpec | None = field(init=False, default=None)
     param_marker: Callable[[int], str | None] | None = None
     func_body: str | None = None
+
+    @property
+    def has_parametrized_test(self) -> bool:
+        if self.num_params > 0 or (self.test_class_spec and self.test_class_spec.has_parametrized_test):
+            return True
+        return False
 
 
 class Counter:
@@ -212,44 +234,57 @@ def get_num_tests_to_be_selected(test_file_specs: list[TestFileSpec], n: str | N
     :param n: N value given for the smoke option
     :param scope: Smoke scope value
     """
+    scopes_handle_class_specs = [None, SmokeScope.CLASS, SmokeScope.AUTO]
 
-    def get_num_expected_tests_per_scope(*test_specs: TestFuncSpec | TestClassSpec | TestFileSpec) -> int:
+    def get_num_expected_tests(
+        *test_specs: TestFuncSpec | TestClassSpec | TestFileSpec, effective_scope: SmokeScope | None = scope
+    ) -> int:
+        if effective_scope == SmokeScope.AUTO:
+            raise ValueError("Must give one of the non-Auto scopes")
+
         n_ = n or str(DEFAULT_N)
-        include_nested_classes = scope not in [SmokeScope.CLASS, SmokeScope.AUTO]
+        include_nested_classes = effective_scope not in scopes_handle_class_specs
         if n_.endswith("%"):
             scale = float(n_[:-1])
             return int(scale_down(get_num_tests(*test_specs, include_nested_classes=include_nested_classes), scale))
         else:
             return min([int(n_), get_num_tests(*test_specs, include_nested_classes=include_nested_classes)])
 
-    test_class_specs = get_test_class_specs(test_file_specs) if scope in [SmokeScope.AUTO, SmokeScope.CLASS] else []
     if scope == SmokeScope.ALL:
-        num_expected_tests = get_num_expected_tests_per_scope(*test_file_specs)
+        num_expected_tests = get_num_expected_tests(*test_file_specs)
     elif scope == SmokeScope.DIRECTORY:
         test_specs_per_dir: dict[str | None, list[TestFuncSpec | TestClassSpec]] = {}
         for test_file_spec in test_file_specs:
             test_specs_per_dir.setdefault(test_file_spec.test_dir, []).extend(test_file_spec.test_specs)
-        num_expected_tests = sum(
-            get_num_expected_tests_per_scope(*test_specs) for test_specs in test_specs_per_dir.values()
-        )
+        num_expected_tests = sum(get_num_expected_tests(*test_specs) for test_specs in test_specs_per_dir.values())
     elif scope == SmokeScope.FILE:
-        num_expected_tests = sum(get_num_expected_tests_per_scope(*x.test_specs) for x in test_file_specs)
-    elif scope == SmokeScope.AUTO:
-        num_expected_tests = sum(
-            [
-                *(get_num_expected_tests_per_scope(x) for x in test_class_specs),
-                *(
-                    get_num_expected_tests_per_scope(x)
-                    for x in get_test_func_specs(test_file_specs, exclude_class=True)
-                ),
-            ]
-        )
+        num_expected_tests = sum(get_num_expected_tests(*x.test_specs) for x in test_file_specs)
     elif scope == SmokeScope.CLASS:
-        num_expected_tests = sum(get_num_expected_tests_per_scope(x) for x in test_class_specs)
+        test_class_specs = get_test_class_specs(test_file_specs)
+        num_expected_tests = sum(get_num_expected_tests(x) for x in test_class_specs)
+    elif scope == SmokeScope.FUNCTION:
+        num_expected_tests = sum(get_num_expected_tests(x) for x in get_test_func_specs(test_file_specs))
     else:
-        # default = function
-        num_expected_tests = sum(get_num_expected_tests_per_scope(x) for x in get_test_func_specs(test_file_specs))
-
+        # default scope = auto
+        num_expected_tests = 0
+        for test_file_spec in test_file_specs:
+            test_func_specs, test_class_specs = _get_test_specs_per_type([test_file_spec])
+            if test_func_specs:
+                if any(x.has_parametrized_test for x in test_func_specs):
+                    num_expected_tests += sum(
+                        get_num_expected_tests(x, effective_scope=SmokeScope.FUNCTION) for x in test_func_specs
+                    )
+                else:
+                    num_expected_tests += get_num_expected_tests(*test_func_specs, effective_scope=SmokeScope.FILE)
+            if test_class_specs:
+                for test_class_spec in test_class_specs:
+                    if test_class_spec.has_parametrized_test:
+                        num_expected_tests += sum(
+                            get_num_expected_tests(x, effective_scope=SmokeScope.FUNCTION)
+                            for x in test_class_spec.test_func_specs
+                        )
+                    else:
+                        num_expected_tests += get_num_expected_tests(test_class_spec, effective_scope=SmokeScope.CLASS)
     return num_expected_tests
 
 

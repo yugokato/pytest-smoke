@@ -6,10 +6,10 @@ from enum import auto
 from functools import cached_property
 from typing import TYPE_CHECKING, Any
 
+from pytest_smoke.compat import StrEnum
+
 if TYPE_CHECKING:
     from pytest import Config, Item
-
-from pytest_smoke.compat import StrEnum
 
 
 class SmokeEnvVar(StrEnum):
@@ -19,10 +19,10 @@ class SmokeEnvVar(StrEnum):
 class SmokeScope(StrEnum):
     FUNCTION = auto()
     CLASS = auto()
-    AUTO = auto()
     FILE = auto()
     DIRECTORY = auto()
     ALL = auto()
+    AUTO = auto()
 
 
 class SmokeSelectMode(StrEnum):

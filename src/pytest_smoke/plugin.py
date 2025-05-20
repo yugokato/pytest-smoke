@@ -22,6 +22,7 @@ from pytest_smoke.types import (
     SmokeSelectMode,
 )
 from pytest_smoke.utils import (
+    Cache,
     generate_group_id,
     parse_ini_option,
     parse_n,
@@ -64,7 +65,7 @@ def pytest_addoption(parser: Parser) -> None:
         type=parse_n,
         nargs="?",
         default=False,
-        help="Run only N tests from each test function or specified scope.\n"
+        help="Run only N tests from each smoke scope.\n"
         "N can be a number (e.g. 5) or a percentage (e.g. 10%%).\n"
         "If not provided, the default value is 1.",
     )
@@ -76,13 +77,15 @@ def pytest_addoption(parser: Parser) -> None:
         help=(
             "Specify the scope at which the value of N from the above options is applied.\n"
             "The plugin provides the following predefined scopes, as well as custom user-defined scopes via a hook:\n"
-            f"- {SmokeScope.FUNCTION}: Applies to each test function (default)\n"
-            f"- {SmokeScope.CLASS}: Applies to each test class\n"
-            f"- {SmokeScope.AUTO}: Applies {SmokeScope.FUNCTION} scope for test functions, "
-            f"{SmokeScope.CLASS} scope for test methods\n"
-            f"- {SmokeScope.FILE}: Applies to each test file\n"
-            f"- {SmokeScope.DIRECTORY}: Applies to each test directory\n"
-            f"- {SmokeScope.ALL}: Applies to the entire test suite"
+            f"- {SmokeScope.FUNCTION}: Applies N to each test function\n"
+            f"- {SmokeScope.CLASS}: Applies N to each test class\n"
+            f"- {SmokeScope.FILE}: Applies N to each test file\n"
+            f"- {SmokeScope.DIRECTORY}: Applies N to each directory a test file is stored\n"
+            f"- {SmokeScope.ALL}: Applies N to the entire test suite\n"
+            f"- {SmokeScope.AUTO} (default): Dynamically determines an ideal scope per parent node (module or class) "
+            "based on the presence of parametrized tests. Uses function scope if any parameterized tests exist under "
+            f"the parent node. Otherwise, falls back to {SmokeScope.FILE} scope for test functions or "
+            f"{SmokeScope.CLASS} scope for test methods."
         ),
     )
     group.addoption(
@@ -108,7 +111,7 @@ def pytest_addoption(parser: Parser) -> None:
     parser.addini(
         SmokeIniOption.SMOKE_DEFAULT_SCOPE,
         type="string",
-        default=SmokeScope.FUNCTION,
+        default=SmokeScope.AUTO,
         help="[pytest-smoke] Override the plugin default value for smoke scope",
     )
     parser.addini(
@@ -174,65 +177,66 @@ def pytest_collection_modifyitems(session: Session, config: Config, items: list[
 
         opt = SmokeOption(config)
         if opt.n:
-            selected_items_regular = []
-            selected_items_critical = []
-            deselected_items = []
-            smoke_groups_reached_threshold = set()
-            counter = SmokeCounter(
-                collected=Counter(filter(None, (generate_group_id(item, opt.scope) for item in items)))
-            )
-            session.stash[STASH_KEY_SMOKE_COUNTER] = counter
-            enable_critical_tests = parse_ini_option(config, SmokeIniOption.SMOKE_MARKED_TESTS_AS_CRITICAL)
+            with Cache.manage():
+                selected_items_regular = []
+                selected_items_critical = []
+                deselected_items = []
+                smoke_groups_reached_threshold = set()
+                counter = SmokeCounter(
+                    collected=Counter(filter(None, (generate_group_id(item, opt.scope) for item in items)))
+                )
+                session.stash[STASH_KEY_SMOKE_COUNTER] = counter
+                enable_critical_tests = parse_ini_option(config, SmokeIniOption.SMOKE_MARKED_TESTS_AS_CRITICAL)
 
-            for item in sort_items(items, session, opt):
-                group_id = generate_group_id(item, opt.scope)
-                if group_id is None:
-                    deselected_items.append(item)
-                    continue
-
-                # Tests that match the below conditions will not be counted towards the calculation of N
-                if enable_critical_tests and (smoke_marker := SmokeMarker.from_item(item)):
-                    if smoke_marker.runif:
-                        selected_items_critical.append(item)
-                        if smoke_marker.mustpass:
-                            counter.mustpass.selected.add(item)
-                        item.stash[STASH_KEY_SMOKE_IS_CIRITICAL] = True
-                        item.stash[STASH_KEY_SMOKE_IS_MUSTPASS] = smoke_marker.mustpass
-                    else:
+                for item in sort_items(items, session, opt):
+                    group_id = generate_group_id(item, opt.scope)
+                    if group_id is None:
                         deselected_items.append(item)
-                    continue
-                elif config.hook.pytest_smoke_include(item=item, scope=opt.scope):
-                    selected_items_regular.append(item)
-                    continue
+                        continue
 
-                if group_id in smoke_groups_reached_threshold:
-                    deselected_items.append(item)
-                    continue
+                    # Tests that match the below conditions will not be counted towards the calculation of N
+                    if enable_critical_tests and (smoke_marker := SmokeMarker.from_item(item)):
+                        if smoke_marker.runif:
+                            selected_items_critical.append(item)
+                            if smoke_marker.mustpass:
+                                counter.mustpass.selected.add(item)
+                            item.stash[STASH_KEY_SMOKE_IS_CIRITICAL] = True
+                            item.stash[STASH_KEY_SMOKE_IS_MUSTPASS] = smoke_marker.mustpass
+                        else:
+                            deselected_items.append(item)
+                        continue
+                    elif config.hook.pytest_smoke_include(item=item, scope=opt.scope):
+                        selected_items_regular.append(item)
+                        continue
 
-                if opt.is_scale:
-                    threshold = scale_down(counter.collected[group_id], float(cast(str, opt.n)[:-1]))
-                else:
-                    threshold = cast(int, opt.n)
-                if counter.selected[group_id] < threshold:
-                    counter.selected.update([group_id])
-                    selected_items_regular.append(item)
-                else:
-                    smoke_groups_reached_threshold.add(group_id)
-                    deselected_items.append(item)
+                    if group_id in smoke_groups_reached_threshold:
+                        deselected_items.append(item)
+                        continue
 
-            assert len(items) == len(selected_items_critical + selected_items_regular + deselected_items)
-            if selected_items_critical or deselected_items:
-                if deselected_items:
-                    config.hook.pytest_deselected(items=deselected_items)
+                    if opt.is_scale:
+                        threshold = scale_down(counter.collected[group_id], float(cast(str, opt.n)[:-1]))
+                    else:
+                        threshold = cast(int, opt.n)
+                    if counter.selected[group_id] < threshold:
+                        counter.selected.update([group_id])
+                        selected_items_regular.append(item)
+                    else:
+                        smoke_groups_reached_threshold.add(group_id)
+                        deselected_items.append(item)
 
-                if opt.select_mode != SmokeSelectMode.FIRST:
-                    # retain the original test order
-                    for smoke_items in (selected_items_critical, selected_items_regular):
-                        if smoke_items:
-                            smoke_items.sort(key=lambda x: items.index(x))
+                assert len(items) == len(selected_items_critical + selected_items_regular + deselected_items)
+                if selected_items_critical or deselected_items:
+                    if deselected_items:
+                        config.hook.pytest_deselected(items=deselected_items)
 
-                items.clear()
-                items.extend(selected_items_critical + selected_items_regular)
+                    if opt.select_mode != SmokeSelectMode.FIRST:
+                        # retain the original test order
+                        for smoke_items in (selected_items_critical, selected_items_regular):
+                            if smoke_items:
+                                smoke_items.sort(key=lambda x: items.index(x))
+
+                    items.clear()
+                    items.extend(selected_items_critical + selected_items_regular)
 
 
 @pytest.hookimpl(wrapper=True)
