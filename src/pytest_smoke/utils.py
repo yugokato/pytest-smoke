@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import os
 import random
+from collections.abc import Generator
+from contextlib import contextmanager
 from decimal import ROUND_HALF_UP, Decimal
-from functools import lru_cache
+from functools import cache, update_wrapper
 from types import ModuleType
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, Any, Callable, ClassVar, cast
 from uuid import UUID
 
 import pytest
@@ -22,7 +24,34 @@ if TYPE_CHECKING:
     from pytest import Config, Item, Session
 
 
-@lru_cache
+class Cache:
+    """Custom functools.cache decorator that provides an easy way to clear cache while allowing unlimited cache size"""
+
+    _cached_wrappers: ClassVar[set[Callable[..., Any]]] = set()
+
+    def __init__(self, f: Callable[..., Any]) -> None:
+        self.func = cache(f)
+        update_wrapper(self, f)
+        Cache._cached_wrappers.add(self.func)
+
+    def __call__(self, *args: Any, **kwargs: Any) -> Any:
+        return self.func(*args, **kwargs)
+
+    @staticmethod
+    @contextmanager
+    def manage() -> Generator[None]:
+        try:
+            yield
+        finally:
+            Cache.clear()
+
+    @staticmethod
+    def clear() -> None:
+        for cached_func in Cache._cached_wrappers:
+            cached_func.cache_clear()  # type: ignore[attr-defined]
+
+
+@Cache
 def scale_down(value: float, percentage: float, precision: int = 0, min_value: int = 1) -> float:
     """Scales down a value with rounding
 
@@ -37,7 +66,7 @@ def scale_down(value: float, percentage: float, precision: int = 0, min_value: i
     return max(val, min_value)
 
 
-@lru_cache
+@Cache
 def generate_group_id(item: Item, scope: str) -> str | None:
     """Generate a smoke scope group ID for the item
 
@@ -54,7 +83,7 @@ def generate_group_id(item: Item, scope: str) -> str | None:
     return _generate_scope_group_id(item, scope)
 
 
-@lru_cache
+@Cache
 def has_parametrized_test(node: Node) -> bool:
     """Check if at least one parametrized test exists in the node
 
@@ -150,12 +179,11 @@ def _round_half_up(x: float, precision: int) -> float:
     return float(Decimal(str(x)).quantize(Decimal("10") ** -precision, rounding=ROUND_HALF_UP))
 
 
-@lru_cache
 def _generate_scope_group_id(item: Item, scope: str) -> str | None:
-    def _generate_class_group_id(current_item: Node, class_id: str = "") -> str:
+    def generate_class_group_id(current_item: Node, class_id: str = "") -> str:
         parent = current_item.parent
         if isinstance(parent, Class):
-            return _generate_class_group_id(parent, class_id=f"::{parent.name}{class_id}")
+            return generate_class_group_id(parent, class_id=f"::{parent.name}{class_id}")
         return class_id
 
     if scope not in [str(x) for x in SmokeScope]:
@@ -180,7 +208,7 @@ def _generate_scope_group_id(item: Item, scope: str) -> str | None:
         return group_id
 
     if is_class_method:
-        group_id += _generate_class_group_id(item)
+        group_id += generate_class_group_id(item)
         if scope == SmokeScope.CLASS:
             return group_id
 
