@@ -35,28 +35,38 @@ def mock_is_xdist_installed(mocker: MockerFixture) -> None:
 @pytest.fixture(scope="session")
 def test_file_specs() -> list[TestFileSpec]:
     """Specifications for test files to generate"""
-    # file1: A test file with non-parametrized test functions
+    # file1: Non-parametrized test functions
     test_file_spec1 = TestFileSpec([TestFuncSpec(), TestFuncSpec()])
-    # file2: A test file with parametrized test functions
-    test_file_spec2 = TestFileSpec([TestFuncSpec(num_params=10), TestFuncSpec(num_params=20)])
-    # file3: A test file with test classes, with/without class-level parametrization
+    # file2: With parametrized test functions
+    test_file_spec2 = TestFileSpec([TestFuncSpec(), TestFuncSpec(num_params=10), TestFuncSpec(num_params=20)])
+    # file3: Test classes with/without class-level parametrization and with/without nested test classes
     test_file_spec3 = TestFileSpec(
         [
-            TestClassSpec("Test1", [TestFuncSpec(num_params=5), TestFuncSpec()]),
-            TestClassSpec("Test2", [TestFuncSpec(num_params=5), TestFuncSpec(num_params=10)]),
-            TestClassSpec("Test3", [TestFuncSpec(num_params=3), TestFuncSpec()], num_params=2),
+            TestClassSpec("Test1", [TestFuncSpec(), TestFuncSpec()]),
+            TestClassSpec("Test2", [TestFuncSpec(), TestFuncSpec(num_params=5), TestFuncSpec(num_params=10)]),
+            TestClassSpec("Test3", [TestFuncSpec(), TestFuncSpec(num_params=3)], num_params=2),
             TestClassSpec(
                 "Test4",
-                [TestFuncSpec()],
+                [TestFuncSpec(), TestFuncSpec()],
+                nested_test_class_specs=[
+                    TestClassSpec("TestNested1", [TestFuncSpec(), TestFuncSpec()]),
+                    TestClassSpec("TestNested2", [TestFuncSpec(), TestFuncSpec(num_params=3)]),
+                    TestClassSpec("TestNested3", [TestFuncSpec(), TestFuncSpec(num_params=2)], num_params=3),
+                ],
+            ),
+            TestClassSpec(
+                "Test5",
+                [TestFuncSpec(), TestFuncSpec()],
                 num_params=2,
                 nested_test_class_specs=[
-                    TestClassSpec("TestNested1", [TestFuncSpec(), TestFuncSpec(num_params=3)]),
-                    TestClassSpec("TestNested2", [TestFuncSpec(), TestFuncSpec(num_params=2)], num_params=3),
+                    TestClassSpec("TestNested1", [TestFuncSpec(), TestFuncSpec()]),
+                    TestClassSpec("TestNested2", [TestFuncSpec(), TestFuncSpec(num_params=3)]),
+                    TestClassSpec("TestNested3", [TestFuncSpec(), TestFuncSpec(num_params=2)], num_params=3),
                 ],
             ),
         ]
     )
-    # file4: A test file with a mix of everything above, inside a sub directory
+    # file4: A mix of everything above, inside a sub directory
     test_file_spec4 = TestFileSpec(
         [*test_file_spec1.test_specs, *test_file_spec2.test_specs, *test_file_spec3.test_specs],
         test_dir="tests_something1",

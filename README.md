@@ -8,8 +8,8 @@ versions](https://img.shields.io/pypi/pyversions/pytest-smoke.svg)](https://pypi
 [![Code style ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://docs.astral.sh/ruff/)
 
 `pytest-smoke` is a `pytest` plugin designed to quickly perform smoke testing on large test suites. It allows you to 
-scale down test execution by limiting the number of tests run from each test function or specified scope to a smaller 
-subset, defined by a value of `N`.
+scale down test execution by limiting the number of tests run from logical groupings (*smoke scopes*) to a smaller 
+subset defined by `N`. 
 
 
 ## Installation
@@ -36,17 +36,19 @@ $ pytest -h
 <snip>
 
 Smoke testing:
-  --smoke=[N]           Run only N tests from each test function or specified scope.
+  --smoke=[N]           Run only N tests from each smoke scope.
                         N can be a number (e.g. 5) or a percentage (e.g. 10%).
                         If not provided, the default value is 1.
   --smoke-scope=SCOPE   Specify the scope at which the value of N from the above options is applied.
                         The plugin provides the following predefined scopes, as well as custom user-defined scopes via a hook:
-                        - function: Applies to each test function (default)
-                        - class: Applies to each test class
-                        - auto: Applies function scope for test functions, class scope for test methods
-                        - file: Applies to each test file
-                        - directory: Applies to each test directory
-                        - all: Applies to the entire test suite
+                        - function: Applies N to each test function
+                        - class: Applies N to each test class
+                        - file: Applies N to each test file
+                        - directory: Applies N to each directory a test file is stored
+                        - all: Applies N to the entire test suite
+                        - auto (default): Dynamically determines an ideal scope per parent node (module or class) based on the presence
+                        of parametrized tests. Uses function scope if any parameterized tests exist under the parent node. Otherwise,
+                        falls back to file scope for test functions or class scope for test methods.
   --smoke-select-mode=MODE
                         Specify the mode for selecting tests from each scope.
                         The plugin provides the following predefined values, as well as custom user-defined values via a hook:
@@ -194,7 +196,7 @@ Plugin default: `1`
 
 ### `smoke_default_scope`
 The default smoke scope to be applied when not explicitly specified with the `--smoke-scope` option.  
-Plugin default: `function`
+Plugin default: `auto`
 
 ### `smoke_default_select_mode`
 The default smoke select mode to be applied when not explicitly specified with the `--smoke-select-mode` 

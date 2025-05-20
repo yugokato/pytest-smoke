@@ -64,7 +64,7 @@ def pytest_addoption(parser: Parser) -> None:
         type=parse_n,
         nargs="?",
         default=False,
-        help="Run only N tests from each test function or specified scope.\n"
+        help="Run only N tests from each smoke scope.\n"
         "N can be a number (e.g. 5) or a percentage (e.g. 10%%).\n"
         "If not provided, the default value is 1.",
     )
@@ -76,13 +76,15 @@ def pytest_addoption(parser: Parser) -> None:
         help=(
             "Specify the scope at which the value of N from the above options is applied.\n"
             "The plugin provides the following predefined scopes, as well as custom user-defined scopes via a hook:\n"
-            f"- {SmokeScope.FUNCTION}: Applies to each test function (default)\n"
-            f"- {SmokeScope.CLASS}: Applies to each test class\n"
-            f"- {SmokeScope.AUTO}: Applies {SmokeScope.FUNCTION} scope for test functions, "
-            f"{SmokeScope.CLASS} scope for test methods\n"
-            f"- {SmokeScope.FILE}: Applies to each test file\n"
-            f"- {SmokeScope.DIRECTORY}: Applies to each test directory\n"
-            f"- {SmokeScope.ALL}: Applies to the entire test suite"
+            f"- {SmokeScope.FUNCTION}: Applies N to each test function\n"
+            f"- {SmokeScope.CLASS}: Applies N to each test class\n"
+            f"- {SmokeScope.FILE}: Applies N to each test file\n"
+            f"- {SmokeScope.DIRECTORY}: Applies N to each directory a test file is stored\n"
+            f"- {SmokeScope.ALL}: Applies N to the entire test suite\n"
+            f"- {SmokeScope.AUTO} (default): Dynamically determines an ideal scope per parent node (module or class) "
+            "based on the presence of parametrized tests. Uses function scope if any parameterized tests exist under "
+            f"the parent node. Otherwise, falls back to {SmokeScope.FILE} scope for test functions or "
+            f"{SmokeScope.CLASS} scope for test methods."
         ),
     )
     group.addoption(
@@ -108,7 +110,7 @@ def pytest_addoption(parser: Parser) -> None:
     parser.addini(
         SmokeIniOption.SMOKE_DEFAULT_SCOPE,
         type="string",
-        default=SmokeScope.FUNCTION,
+        default=SmokeScope.AUTO,
         help="[pytest-smoke] Override the plugin default value for smoke scope",
     )
     parser.addini(

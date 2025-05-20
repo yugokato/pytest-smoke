@@ -27,7 +27,12 @@ def test_smoke_command_help(pytester: Pytester) -> None:
         r"\n"
         + r"Smoke testing:\n"
         + (r"  --smoke=\[N\]\s+.+")
-        + (r"  --smoke-scope=SCOPE\s+.+" + r"\n".join(rf"\s+- {s}: .+" for s in SmokeScope))
+        + (
+            r"  --smoke-scope=SCOPE\s+.+"
+            + r"\n".join(
+                rf"\s+- {s + (re.escape(' (default)') if s == SmokeScope.AUTO else '')}: .+" for s in SmokeScope
+            )
+        )
         + (r"  --smoke-select-mode=MODE\s+.+" + r"\n".join(rf"\s+- {s}: .+" for s in SmokeSelectMode))
         + r"\n"
     )
