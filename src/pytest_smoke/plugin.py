@@ -137,9 +137,6 @@ def pytest_addoption(parser: Parser) -> None:
 
 @pytest.hookimpl(tryfirst=True)
 def pytest_configure(config: Config) -> None:
-    if not config.option.smoke and (config.option.smoke_scope or config.option.smoke_select_mode):
-        raise pytest.UsageError("The --smoke option is requierd to use the pytest-smoke functionality")
-
     config.addinivalue_line(
         "markers",
         "smoke(*, mustpass=False, runif=True): [pytest-smoke] When running smoke tests using the pytest-smoke plugin, "
@@ -151,13 +148,16 @@ def pytest_configure(config: Config) -> None:
         "Note: The marker will have no effect on the plugin until the feature has been enabled",
     )
 
-    if smoke.is_xdist_installed:
-        if config.pluginmanager.has_plugin("xdist"):
-            # Register the smoke-xdist plugin if -n/--numprocesses option is given.
-            if config.getoption("numprocesses", default=None):
-                config.pluginmanager.register(PytestSmokeXdist(), name=PytestSmokeXdist.name)
-        else:
-            smoke.is_xdist_installed = False
+    if config.option.smoke:
+        if smoke.is_xdist_installed:
+            if config.pluginmanager.has_plugin("xdist"):
+                # Register the smoke-xdist plugin if -n/--numprocesses option is given.
+                if config.getoption("numprocesses", default=None):
+                    config.pluginmanager.register(PytestSmokeXdist(), name=PytestSmokeXdist.name)
+            else:
+                smoke.is_xdist_installed = False
+    elif config.option.smoke_scope or config.option.smoke_select_mode:
+        raise pytest.UsageError("The --smoke option is requierd to use the pytest-smoke functionality")
 
 
 @pytest.hookimpl(wrapper=True, tryfirst=True)

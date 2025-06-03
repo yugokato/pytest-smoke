@@ -22,8 +22,7 @@ if smoke.is_xdist_installed:
 
         def _split_scope(self, nodeid: str) -> str:
             item = self._nodes[nodeid]
-
-            return generate_group_id(item, self.smoke_option.scope) or super()._split_scope(nodeid)
+            return generate_group_id(item, self.smoke_option.scope)
 
     class PytestSmokeXdist:
         """A plugin that extends pytest-smoke to seamlesslly support pytest-xdist
