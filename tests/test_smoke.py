@@ -14,7 +14,6 @@ from tests.helper import (
     generate_test_code,
     get_num_tests,
     get_num_tests_to_be_selected,
-    requires_xdist,
 )
 
 
@@ -51,11 +50,15 @@ def test_smoke_show_markers(pytester: Pytester) -> None:
     result.stdout.re_match_lines([r"@pytest\.mark\.smoke\(\*, mustpass=False, runif=True\): .+"])
 
 
+@pytest.mark.parametrize("with_xdist", [False, pytest.param(True, marks=pytest.mark.xdist)])
 @pytest.mark.usefixtures("generate_test_files")
-def test_smoke_no_option(pytester: Pytester, test_file_specs: list[TestFileSpec]) -> None:
-    """Test the plugin does not affect pytest when no plugin options are given"""
+def test_smoke_no_option(pytester: Pytester, test_file_specs: list[TestFileSpec], with_xdist) -> None:
+    """Test the plugin does not affect pytest/pytest-xdist when no plugin options are given"""
     num_all_tests = get_num_tests(*test_file_specs)
-    result = pytester.runpytest()
+    args = []
+    if with_xdist:
+        args.extend(["-n", "auto"])
+    result = pytester.runpytest(*args)
     assert result.ret == ExitCode.OK
     result.assert_outcomes(passed=num_all_tests)
 
@@ -212,7 +215,7 @@ def test_smoke_marker_critical_tests(pytester: Pytester, mustpass: bool, runif: 
             assert result_word == "PASSED"
 
 
-@requires_xdist
+@pytest.mark.xdist
 @pytest.mark.usefixtures("generate_test_files")
 @pytest.mark.parametrize("select_mode", [None, *SmokeSelectMode])
 @pytest.mark.parametrize("scope", [None, *SmokeScope])
@@ -239,7 +242,7 @@ def test_smoke_xdist(
     result.assert_outcomes(passed=num_tests_to_be_selected, deselected=num_all_tests - num_tests_to_be_selected)
 
 
-@requires_xdist
+@pytest.mark.xdist
 @pytest.mark.parametrize("select_mode", [None, *SmokeSelectMode])
 def test_smoke_xdist_disabled(pytester: Pytester, select_mode: str | None) -> None:
     """Test that pytest-smoke does not access the pytest-xdist plugin when it is install but explicitly disabled"""

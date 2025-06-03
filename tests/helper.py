@@ -10,12 +10,10 @@ from typing import Any
 
 import pytest
 
-from pytest_smoke import smoke
 from pytest_smoke.plugin import DEFAULT_N, SmokeScope
 from pytest_smoke.utils import scale_down
 
 TEST_NAME_BASE = "test_something"
-requires_xdist = pytest.mark.skipif(not smoke.is_xdist_installed, reason="pytest-xdist is required")
 
 
 @dataclass
