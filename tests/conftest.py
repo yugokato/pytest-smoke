@@ -1,11 +1,17 @@
+from __future__ import annotations
+
 import os
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import pytest
 from pytest import Pytester
 from pytest_mock import MockerFixture
 
 from pytest_smoke import smoke
+
+if TYPE_CHECKING:
+    from pytest import Item
+
 
 if os.environ.get("IGNORE_XDIST") == "true":
     smoke.is_xdist_installed = False
@@ -15,6 +21,11 @@ from tests.helper import TestClassSpec, TestFileSpec, TestFuncSpec, generate_tes
 
 Pytester.runpytest = patch_runpytest(Pytester.runpytest)
 pytest_plugins = "pytester"
+
+
+def pytest_runtest_setup(item: Item):
+    if item.get_closest_marker("xdist") and not smoke.is_xdist_installed:
+        pytest.skip(reason="pytest-xdist is required")
 
 
 @pytest.hookimpl(trylast=True)

@@ -7,7 +7,7 @@ from pytest import ExitCode, Pytester
 
 from pytest_smoke import smoke
 from pytest_smoke.types import SmokeIniOption, SmokeScope, SmokeSelectMode
-from tests.helper import TEST_NAME_BASE, TestFileSpec, TestFuncSpec, generate_test_code, requires_xdist
+from tests.helper import TEST_NAME_BASE, TestFileSpec, TestFuncSpec, generate_test_code
 
 if smoke.is_xdist_installed:
     from xdist.scheduler import LoadScheduling
@@ -63,7 +63,7 @@ def test_smoke_ini_option_smoke_default_select_mode(pytester: Pytester) -> None:
     assert [int(n) for n in matched_test_nums] == list(range(num_tests))[-smoke_n:]
 
 
-@requires_xdist
+@pytest.mark.xdist
 @pytest.mark.parametrize("dist_option", [None, "--dist=load", "-d"])
 @pytest.mark.parametrize("value", ["true", "false", None])
 def test_smoke_ini_option_smoke_default_xdist_dist_by_scope(
@@ -153,7 +153,7 @@ def test_smoke_ini_option_smoke_marked_tests_as_critical(pytester: Pytester, val
 @pytest.mark.parametrize(
     "ini_option",
     [
-        pytest.param(x, marks=requires_xdist if x == SmokeIniOption.SMOKE_DEFAULT_XDIST_DIST_BY_SCOPE else [])
+        pytest.param(x, marks=pytest.mark.xdist if x == SmokeIniOption.SMOKE_DEFAULT_XDIST_DIST_BY_SCOPE else [])
         for x in SmokeIniOption
     ],
 )
