@@ -52,7 +52,7 @@ def test_smoke_show_markers(pytester: Pytester) -> None:
 
 @pytest.mark.parametrize("with_xdist", [False, pytest.param(True, marks=pytest.mark.xdist)])
 @pytest.mark.usefixtures("generate_test_files")
-def test_smoke_no_option(pytester: Pytester, test_file_specs: list[TestFileSpec], with_xdist) -> None:
+def test_smoke_no_option(pytester: Pytester, test_file_specs: list[TestFileSpec], with_xdist: bool) -> None:
     """Test the plugin does not affect pytest/pytest-xdist when no plugin options are given"""
     num_all_tests = get_num_tests(*test_file_specs)
     args = []

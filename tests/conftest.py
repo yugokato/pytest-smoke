@@ -23,7 +23,7 @@ Pytester.runpytest = patch_runpytest(Pytester.runpytest)
 pytest_plugins = "pytester"
 
 
-def pytest_runtest_setup(item: Item):
+def pytest_runtest_setup(item: Item) -> None:
     if item.get_closest_marker("xdist") and not smoke.is_xdist_installed:
         pytest.skip(reason="pytest-xdist is required")
 

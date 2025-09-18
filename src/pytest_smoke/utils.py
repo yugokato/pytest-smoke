@@ -110,7 +110,7 @@ def sort_items(items: list[Item], session: Session, smoke_option: SmokeOption) -
     elif smoke_option.select_mode == SmokeSelectMode.RANDOM:
         random_: random.Random | ModuleType
         if smoke.is_xdist_installed and (is_xdist_controller(session) or is_xdist_worker(session)):
-            # Set the seed to ensure XDIST controler and workers collect the same items
+            # Set the seed to ensure XDIST controller and workers collect the same items
             random_ = random.Random(UUID(os.environ[SmokeEnvVar.SMOKE_TEST_SESSION_UUID]).time)
         else:
             random_ = random
