@@ -12,14 +12,13 @@ authors = [
   { name = "Yugo Kato" },
 ]
 keywords = ["pytest", "smoke", "smoke testing"]
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 classifiers = [
   "Development Status :: 4 - Beta",
   "Framework :: Pytest",
   "Intended Audience :: Developers",
   "License :: OSI Approved :: MIT License",
   "Programming Language :: Python :: 3 :: Only",
-  "Programming Language :: Python :: 3.9",
   "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
