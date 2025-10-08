@@ -12,8 +12,8 @@ if TYPE_CHECKING:
     from pytest import Config, Item
 
 
-class SmokeEnvVar(StrEnum):
-    SMOKE_TEST_SESSION_UUID = auto()
+class SmokeEnvVar:
+    SMOKE_TEST_SESSION_UUID = "SMOKE_TEST_SESSION_UUID"
 
 
 class SmokeScope(StrEnum):
