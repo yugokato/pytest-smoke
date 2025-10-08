@@ -2,12 +2,12 @@ from __future__ import annotations
 
 import os
 import random
-from collections.abc import Generator
+from collections.abc import Callable, Generator
 from contextlib import contextmanager
 from decimal import ROUND_HALF_UP, Decimal
 from functools import cache, update_wrapper
 from types import ModuleType
-from typing import TYPE_CHECKING, Any, Callable, ClassVar, cast
+from typing import TYPE_CHECKING, Any, ClassVar, cast
 from uuid import UUID
 
 import pytest
