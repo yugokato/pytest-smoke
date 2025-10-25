@@ -10,11 +10,31 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      src: ${{ steps.filter.outputs.src }}
+      tests: ${{ steps.filter.outputs.tests }}
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+      - name: Check changed files
+        uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            src:
+              - 'src/**'
+            tests:
+              - 'tests/**'
+
   lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - name: Check out
+        uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
         with:
           python-version: "3.10"
       - name: Install uv
@@ -31,10 +51,12 @@ jobs:
           pre-commit run --all-files --show-diff-on-failure
 
   package:
-    needs: [lint]
+    needs: [ changes, lint ]
+    if: ${{ needs.changes.outputs.src == 'true' || needs.changes.outputs.tests == 'true' }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Check out
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
       - name: Build and Check Package
@@ -42,6 +64,7 @@ jobs:
 
   test:
     needs: [package]
+    if: ${{ needs.changes.outputs.src == 'true' || needs.changes.outputs.tests == 'true' }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -49,25 +72,26 @@ jobs:
         python-version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
         os: ["ubuntu-latest", "windows-latest"]
     steps:
-    - uses: actions/checkout@v4
-    - name: Download Package
-      uses: actions/download-artifact@v4
-      with:
-        name: Packages
-        path: dist
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v5
-      with:
-        python-version: ${{ matrix.python-version }}
-    - name: Install uv
-      uses: astral-sh/setup-uv@v5
-      with:
-        enable-cache: true
-        cache-dependency-glob: "**/pyproject.toml"
-    - name: Install tox
-      run: |
-        uv pip install --system tox tox-uv
-    - name: Test
-      shell: bash
-      run: |
-        tox -e py,xdist --installpkg `find dist/*.tar.gz`
+      - name: Check out
+        uses: actions/checkout@v4
+      - name: Download Package
+        uses: actions/download-artifact@v4
+        with:
+          name: Packages
+          path: dist
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          cache-dependency-glob: "**/pyproject.toml"
+      - name: Install tox
+        run: |
+          uv pip install --system tox tox-uv
+      - name: Test
+        shell: bash
+        run: |
+          tox -e py,xdist --installpkg `find dist/*.tar.gz`
