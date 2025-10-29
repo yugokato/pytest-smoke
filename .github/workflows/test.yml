@@ -13,8 +13,7 @@ jobs:
   changes:
     runs-on: ubuntu-latest
     outputs:
-      src: ${{ steps.filter.outputs.src }}
-      tests: ${{ steps.filter.outputs.tests }}
+      has-changes: ${{ steps.filter.outputs.has-changes }}
     steps:
       - name: Check out
         uses: actions/checkout@v4
@@ -23,9 +22,8 @@ jobs:
         id: filter
         with:
           filters: |
-            src:
+            has-changes:
               - 'src/**'
-            tests:
               - 'tests/**'
 
   lint:
@@ -51,7 +49,7 @@ jobs:
           pre-commit run --all-files --show-diff-on-failure
 
   package:
-    needs: [ changes, lint ]
+    needs: [changes, lint]
     if: ${{ needs.changes.outputs.src == 'true' || needs.changes.outputs.tests == 'true' }}
     runs-on: ubuntu-latest
     steps:
@@ -64,7 +62,7 @@ jobs:
 
   test:
     needs: [package]
-    if: ${{ needs.changes.outputs.src == 'true' || needs.changes.outputs.tests == 'true' }}
+    if: ${{ needs.changes.outputs.has-changes == 'true' }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -95,3 +93,14 @@ jobs:
         shell: bash
         run: |
           tox -e py,xdist --installpkg `find dist/*.tar.gz`
+
+  status-check:
+    if: always()
+    needs: [lint, package, test]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check results
+        if: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}
+        run: |
+          echo "Status check failed for one or more jobs"
+          exit 1
