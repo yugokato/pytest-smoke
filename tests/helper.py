@@ -170,10 +170,10 @@ def generate_test_code(test_spec: TestFileSpec | TestFuncSpec) -> str:
             )
         if test_class_spec:
             params = ["self", *params]
-        func_args = ", ".join(params)
-        func_body = test_func_spec.func_body or "\tpass\n"
         tabs = "\t" * indent
-        code += f"{tabs}def {name}({func_args}):{func_body}\n"
+        func_args = ", ".join(params)
+        func_body = "\n".join(f"{tabs}\t{x}" for x in (test_func_spec.func_body or "pass\n").split("\n"))
+        code += f"{tabs}def {name}({func_args}):\n{func_body}\n"
 
     if isinstance(test_spec, TestFileSpec):
         for i, spec in enumerate(test_spec.test_specs, start=1):
