@@ -74,14 +74,23 @@ def test_smoke_ini_option_smoke_default_xdist_dist_by_scope(
     The plugin should extend the pytest-xdist to use the custom scheduler when the INI option value is true and
     when no dist option (--dist or -d) is explicitly given
     """
-    from xdist import __version__ as xdist_ver
-
     num_tests_1 = 100
     num_tests_2 = 100
     test_file_spec = TestFileSpec([TestFuncSpec(num_params=num_tests_1), TestFuncSpec(num_params=num_tests_2)])
     num_test_func = len(test_file_spec.test_specs)
     smoke_n = 99
     pytester.makepyfile(test_xdist=generate_test_code(test_file_spec))
+    pytester.makeconftest("""
+    import random
+    import pytest
+
+    @pytest.hookimpl(tryfirst=True)
+    def pytest_collection_modifyitems(items):
+        # Shuffle tests so that tests will be reasonably distributed among workers for --dist=load.
+        # This addresses the flaky test result
+        random.seed(0)
+        random.shuffle(items)
+    """)
     if value:
         pytester.makeini(f"""
         [pytest]
@@ -90,10 +99,6 @@ def test_smoke_ini_option_smoke_default_xdist_dist_by_scope(
     args = ["--smoke", str(smoke_n), "-v", "-n", "2"]
     if dist_option:
         args.append(dist_option)
-        if tuple(map(int, xdist_ver.split("."))) >= (3, 2, 0):
-            # Sometimes our github test workflow on windows fails as tests don't get distributed evenly.
-            # Add --maxschedchunk=1 as a workaround
-            args.extend(["--maxschedchunk", "1"])
 
     result = pytester.runpytest(*args)
     assert result.ret == ExitCode.OK
