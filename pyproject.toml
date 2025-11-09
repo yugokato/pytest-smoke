@@ -28,7 +28,7 @@ classifiers = [
   "Topic :: Software Development :: Testing",
 ]
 dependencies = [
-    "pytest>=7.0.0,<9",
+    "pytest>=7.0.0,<10",
     "pluggy>=1.2.0"
 ]
 dynamic = ["version"]

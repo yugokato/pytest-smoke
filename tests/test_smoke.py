@@ -37,9 +37,7 @@ def test_smoke_command_help(pytester: Pytester) -> None:
     )
     assert re.search(pattern1, stdout, re.DOTALL)
 
-    pattern2 = r"\[pytest\] ini-options.+" + r"\n".join(
-        rf"  {opt} \([^)]+\):\s+\[pytest-smoke\] .+" for opt in SmokeIniOption
-    )
+    pattern2 = r"\[pytest\] .+" + r"\n".join(rf"  {opt} \([^)]+\):\s+\[pytest-smoke\] .+" for opt in SmokeIniOption)
     assert re.search(pattern2, stdout, re.DOTALL)
 
 
