@@ -42,7 +42,7 @@ if TYPE_CHECKING:
 
 
 STASH_KEY_SMOKE_COUNTER = StashKey[SmokeCounter]()
-STASH_KEY_SMOKE_IS_CIRITICAL = StashKey[bool]()
+STASH_KEY_SMOKE_IS_CRITICAL = StashKey[bool]()
 STASH_KEY_SMOKE_IS_MUSTPASS = StashKey[bool]()
 STASH_KEY_SMOKE_SHOULD_SKIP_RESET = StashKey[bool]()
 DEFAULT_N = SmokeDefaultN(1)
@@ -157,7 +157,7 @@ def pytest_configure(config: Config) -> None:
             else:
                 smoke.is_xdist_installed = False
     elif config.option.smoke_scope or config.option.smoke_select_mode:
-        raise pytest.UsageError("The --smoke option is requierd to use the pytest-smoke functionality")
+        raise pytest.UsageError("The --smoke option is required to use the pytest-smoke functionality")
 
 
 @pytest.hookimpl(wrapper=True, tryfirst=True)
@@ -198,7 +198,7 @@ def pytest_collection_modifyitems(session: Session, config: Config, items: list[
                                 selected_items_critical.append(item)
                                 if smoke_marker.mustpass:
                                     counter.mustpass.selected.add(item)
-                                item.stash[STASH_KEY_SMOKE_IS_CIRITICAL] = True
+                                item.stash[STASH_KEY_SMOKE_IS_CRITICAL] = True
                                 item.stash[STASH_KEY_SMOKE_IS_MUSTPASS] = smoke_marker.mustpass
                             else:
                                 deselected_items.append(item)
@@ -242,9 +242,9 @@ def pytest_runtest_protocol(item: Item, nextitem: Item | None) -> Generator[None
     try:
         return (yield)
     finally:
-        if nextitem and item.stash.get(STASH_KEY_SMOKE_IS_CIRITICAL, False):
+        if nextitem and item.stash.get(STASH_KEY_SMOKE_IS_CRITICAL, False):
             counter = item.session.stash[STASH_KEY_SMOKE_COUNTER].mustpass
-            if counter.failed and not nextitem.stash.get(STASH_KEY_SMOKE_IS_CIRITICAL, False):
+            if counter.failed and not nextitem.stash.get(STASH_KEY_SMOKE_IS_CRITICAL, False):
                 # At least one must-pass test failed, and this is the last critical test.
                 # Set the flag to skip all subsequent regular tests
                 item.session.stash[STASH_KEY_SMOKE_SHOULD_SKIP_RESET] = True
