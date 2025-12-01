@@ -243,7 +243,7 @@ def test_smoke_xdist(
 @pytest.mark.xdist
 @pytest.mark.parametrize("select_mode", [None, *SmokeSelectMode])
 def test_smoke_xdist_disabled(pytester: Pytester, select_mode: str | None) -> None:
-    """Test that pytest-smoke does not access the pytest-xdist plugin when it is install but explicitly disabled"""
+    """Test that pytest-smoke does not access the pytest-xdist plugin when it is installed but explicitly disabled"""
     assert smoke.is_xdist_installed
     num_tests = 10
     pytester.makepyfile(generate_test_code(TestFuncSpec(num_params=num_tests)))
@@ -272,4 +272,4 @@ def test_smoke_without_n_option(pytester: Pytester, option: str) -> None:
     """Test the --smoke option is required to use any functionality provided by the plugin"""
     result = pytester.runpytest(option, "foo")
     assert result.ret == ExitCode.USAGE_ERROR
-    result.stderr.re_match_lines([r"ERROR: The --smoke option is requierd to use the pytest-smoke functionality"])
+    result.stderr.re_match_lines([r"ERROR: The --smoke option is required to use the pytest-smoke functionality"])
