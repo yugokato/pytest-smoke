@@ -231,7 +231,7 @@ def pytest_collection_modifyitems(session: Session, config: Config, items: list[
                             # retain the original test order
                             for smoke_items in (selected_items_critical, selected_items_regular):
                                 if smoke_items:
-                                    smoke_items.sort(key=lambda x: items.index(x))
+                                    smoke_items.sort(key=items.index)
 
                         items.clear()
                         items.extend(selected_items_critical + selected_items_regular)
