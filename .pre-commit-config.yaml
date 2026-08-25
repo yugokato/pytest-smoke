@@ -7,6 +7,10 @@ repos:
       args:
         - --unsafe
     - id: end-of-file-fixer
+- repo: https://github.com/astral-sh/uv-pre-commit
+  rev: 0.12.5
+  hooks:
+    - id: uv-lock
 - repo: local
   hooks:
     - id: ruff

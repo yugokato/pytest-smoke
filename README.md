@@ -213,3 +213,16 @@ Plugin default: `false`
 ### `smoke_marked_tests_as_critical`
 Treat tests marked with `@pytest.mark.smoke` as "critical" smoke tests.    
 Plugin default: `false`
+
+
+## Development
+
+This project uses [uv](https://docs.astral.sh/uv/) for dependency management. Editing dependencies in
+`pyproject.toml` requires re-running `uv lock` and committing the updated `uv.lock`. CI rejects a stale lock.
+
+```bash
+uv sync                      # create .venv with all dev dependencies
+uv run pre-commit install    # install git hooks (keeps uv.lock in sync)
+uv run pytest tests -n auto  # run the test suite
+uv run tox                   # run the full test/lint matrix
+```

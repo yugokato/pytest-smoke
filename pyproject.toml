@@ -27,13 +27,13 @@ classifiers = [
   "Topic :: Software Development :: Quality Assurance",
   "Topic :: Software Development :: Testing",
 ]
+dynamic = ["version"]
 dependencies = [
     "pytest>=7.0.0,<10",
     "pluggy>=1.2.0"
 ]
-dynamic = ["version"]
 
-[project.optional-dependencies]
+[dependency-groups]
 lint = [
     "mypy>=2.0.0,<3",
     "pre-commit>=3.0.0,<5",
@@ -41,12 +41,16 @@ lint = [
 ]
 test = [
     "pytest-mock>=3.0.0,<4",
-    "pytest-xdist[psutil]>=2.3.0,<4"
+    "pytest-xdist[psutil]>=2.3.0,<4",
+]
+tox = [
+    "tox>=4.22.0,<5",
+    "tox-uv>=1.36.0,<2",
 ]
 dev = [
-    "tox>=4.0.0,<5",
-    "tox-uv>=1.0.0,<2",
-    "pytest-smoke[lint,test]",
+    {include-group = "lint"},
+    {include-group = "test"},
+    {include-group = "tox"},
 ]
 
 [project.urls]
@@ -54,6 +58,9 @@ Homepage = "https://github.com/yugokato/pytest-smoke"
 
 [project.entry-points.pytest11]
 smoke = "pytest_smoke.plugin"
+
+[tool.uv]
+required-version = ">=0.12.5"
 
 
 [tool.setuptools.packages.find]
