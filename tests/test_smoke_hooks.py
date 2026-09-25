@@ -11,7 +11,7 @@ from tests.helper import TEST_NAME_BASE, TestFuncSpec, generate_test_code
 
 @pytest.mark.parametrize("with_hook", [True, False])
 def test_smoke_hook_pytest_smoke_generate_group_id(pytester: Pytester, with_hook: bool) -> None:
-    """Test pytest_smoke_generate_group_id hook and custome scopes, with/without hook definition"""
+    """Test pytest_smoke_generate_group_id hook and custom scopes, with/without hook definition"""
     custom_scope = "my-scope"
     num_tests = 10
     smoke_n = 2
@@ -73,10 +73,10 @@ def test_smoke_hook_pytest_smoke_exclude(pytester: Pytester, n: str) -> None:
         num_expected_selected_tests = min([int(n), num_selectable_tests])
 
     def param_marker(i: int) -> str | None:
-        reminder = i % divisor
-        if reminder == 1:
+        remainder = i % divisor
+        if remainder == 1:
             return "skip"
-        elif reminder == 2:
+        elif remainder == 2:
             return "xfail"
         return None
 
