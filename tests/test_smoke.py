@@ -196,7 +196,7 @@ def test_smoke_marker_critical_tests(pytester: Pytester, mustpass: bool, runif: 
         )
         assert test_name == expected_test_name
         if i < num_critical_tests:
-            # ciritical tests
+            # critical tests
             assert is_critical(int(param_idx))
             word = "FAILED" if num_fails and int(param_idx) in test2_pos_mustpass[:num_fails] else "PASSED"
             if mustpass and int(param_idx) in test2_pos_mustpass:

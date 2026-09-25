@@ -25,7 +25,7 @@ if smoke.is_xdist_installed:
             return generate_group_id(item, self.smoke_option.scope)
 
     class PytestSmokeXdist:
-        """A plugin that extends pytest-smoke to seamlesslly support pytest-xdist
+        """A plugin that extends pytest-smoke to seamlessly support pytest-xdist
 
         This plugin will be dynamically registered when the -n/--numprocesses option is given
         """

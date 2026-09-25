@@ -334,7 +334,7 @@ def mock_column_width(width: int) -> Generator[None, Any, None]:
 def patch_runpytest(f: Callable[..., Any]) -> Callable[..., Any]:
     """A decorator for patching pytester.runpytest() to temporarily mock the column width during a test when the -v
     option is given to ensure the stdout is captured in a standard terminal size.
-    This prevents the flaky test results caused by a teser's actual terminal size
+    This prevents the flaky test results caused by a tester's actual terminal size
     """
 
     @wraps(f)
