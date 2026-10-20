@@ -2,11 +2,9 @@ from __future__ import annotations
 
 from collections import Counter
 from dataclasses import dataclass, field
-from enum import auto
+from enum import StrEnum, auto
 from functools import cached_property
-from typing import TYPE_CHECKING, Any
-
-from pytest_smoke.compat import StrEnum
+from typing import TYPE_CHECKING, Any, Self
 
 if TYPE_CHECKING:
     from pytest import Config, Item
@@ -83,7 +81,7 @@ class SmokeMarker:
         self.runif = bool(runif)
 
     @classmethod
-    def from_item(cls, item: Item) -> SmokeMarker | None:
+    def from_item(cls, item: Item) -> Self | None:
         if marker := item.get_closest_marker("smoke"):
             return cls(*marker.args, **marker.kwargs)
         return None
